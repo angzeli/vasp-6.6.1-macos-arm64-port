@@ -1,0 +1,7 @@
+observable	VASP_5.4.4	VASP_6.6.1	absolute_difference	tolerance	result
+energy_eV_per_formula_unit	-28.75501253	-28.75501261	8.0000003066516e-08	0.0001	PASS
+electron_count	62.0	62.0	0.0	0	PASS
+mesh_gap_eV	0.30290000000000017	0.30290000000000017	0.0	0.001	PASS
+pressure_kbar	0.08951927999999999	0.09391928333333334	0.004400003333333347	0.1	PASS
+maximum_force_difference_eV_per_A	0	1.5489999999999948e-05	1.5489999999999948e-05	0.001	PASS
+maximum_stress_difference_kbar	0	0.00443723	0.00443723	0.1	PASS
