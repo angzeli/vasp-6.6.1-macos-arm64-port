@@ -1,0 +1,98 @@
+binary	/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl
+sha256	61b06973424d6eb6410e4ab137af0242c076b84190db46595edc9362200a0b40
+native_images_checked	18
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/gcc/lib/gcc/current/libstdc++.6.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libstdc++.6.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/scalapack/lib/libscalapack.2.2.dylib	/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.2.2.3.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/openblas/lib/libopenblas.0.dylib	/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblasp-r0.3.34.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/fftw/lib/libfftw3.3.dylib	/opt/homebrew/Cellar/fftw/3.3.11/lib/libfftw3.3.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/open-mpi/lib/libmpi_usempif08.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/open-mpi/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/open-mpi/lib/libmpi_mpifh.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/open-mpi/lib/libmpi.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib
+/Users/liangze/Desktop/squiddy tools/vasp-6.6.1-macos-arm64-port/macos-arm64/bin/vasp_ncl	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libstdc++.6.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libstdc++.6.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libstdc++.6.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libstdc++.6.dylib	/usr/lib/libiconv.2.dylib	system dyld cache
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libstdc++.6.dylib	@rpath/libgcc_s.1.1.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgcc_s.1.1.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libstdc++.6.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.2.2.3.dylib	/opt/homebrew/opt/scalapack/lib/libscalapack.2.2.dylib	/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.2.2.3.dylib
+/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.2.2.3.dylib	/opt/homebrew/opt/openblas/lib/libopenblas.0.dylib	/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblasp-r0.3.34.dylib
+/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.2.2.3.dylib	/opt/homebrew/opt/open-mpi/lib/libmpi.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib
+/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.2.2.3.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib
+/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.2.2.3.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib
+/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.2.2.3.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblasp-r0.3.34.dylib	/opt/homebrew/opt/openblas/lib/libopenblas.0.dylib	/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblasp-r0.3.34.dylib
+/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblasp-r0.3.34.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib
+/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblasp-r0.3.34.dylib	/opt/homebrew/opt/libomp/lib/libomp.dylib	/opt/homebrew/Cellar/libomp/22.1.8/lib/libomp.dylib
+/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblasp-r0.3.34.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib
+/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblasp-r0.3.34.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/fftw/3.3.11/lib/libfftw3.3.dylib	/opt/homebrew/opt/fftw/lib/libfftw3.3.dylib	/opt/homebrew/Cellar/fftw/3.3.11/lib/libfftw3.3.dylib
+/opt/homebrew/Cellar/fftw/3.3.11/lib/libfftw3.3.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/opt/open-mpi/lib/libmpi_usempif08.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/opt/libevent/lib/libevent_core-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/opt/libevent/lib/libevent_pthreads-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/opt/hwloc/lib/libhwloc.15.dylib	/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/opt/pmix/lib/libpmix.2.dylib	/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/opt/open-mpi/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/opt/libevent/lib/libevent_core-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/opt/libevent/lib/libevent_pthreads-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/opt/hwloc/lib/libhwloc.15.dylib	/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/opt/pmix/lib/libpmix.2.dylib	/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib	/opt/homebrew/opt/open-mpi/lib/libmpi_mpifh.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib	/opt/homebrew/opt/libevent/lib/libevent_core-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib	/opt/homebrew/opt/libevent/lib/libevent_pthreads-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib	/opt/homebrew/opt/hwloc/lib/libhwloc.15.dylib	/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib	/opt/homebrew/opt/pmix/lib/libpmix.2.dylib	/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib	/opt/homebrew/opt/open-mpi/lib/libmpi.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib	/opt/homebrew/opt/libevent/lib/libevent_core-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib	/opt/homebrew/opt/libevent/lib/libevent_pthreads-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib	/opt/homebrew/opt/hwloc/lib/libhwloc.15.dylib	/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib	/opt/homebrew/opt/pmix/lib/libpmix.2.dylib	/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib	@rpath/libquadmath.0.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib	@rpath/libgcc_s.1.1.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgcc_s.1.1.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgcc_s.1.1.dylib	/opt/homebrew/opt/gcc/lib/gcc/current/libgcc_s.1.1.dylib	/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgcc_s.1.1.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgcc_s.1.1.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/libomp/22.1.8/lib/libomp.dylib	/opt/homebrew/opt/libomp/lib/libomp.dylib	/opt/homebrew/Cellar/libomp/22.1.8/lib/libomp.dylib
+/opt/homebrew/Cellar/libomp/22.1.8/lib/libomp.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/opt/homebrew/opt/open-mpi/lib/libopen-pal.80.dylib	/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/opt/homebrew/opt/libevent/lib/libevent_core-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/opt/homebrew/opt/libevent/lib/libevent_pthreads-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/opt/homebrew/opt/hwloc/lib/libhwloc.15.dylib	/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib	/opt/homebrew/opt/pmix/lib/libpmix.2.dylib	/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib
+/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib	/opt/homebrew/opt/libevent/lib/libevent_core-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib
+/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib	/opt/homebrew/opt/libevent/lib/libevent_pthreads-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib
+/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib	/opt/homebrew/opt/hwloc/lib/libhwloc.15.dylib	/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib
+/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib	/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation	system dyld cache
+/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib	/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit	system dyld cache
+/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib	/usr/lib/libxml2.2.dylib	system dyld cache
+/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib	/System/Library/Frameworks/OpenCL.framework/Versions/A/OpenCL	system dyld cache
+/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib	/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation	system dyld cache
+/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib	/opt/homebrew/opt/pmix/lib/libpmix.2.dylib	/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib
+/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib	/usr/lib/libSystem.B.dylib	system dyld cache
+/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib	/opt/homebrew/opt/libevent/lib/libevent_core-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib
+/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib	/opt/homebrew/opt/libevent/lib/libevent_pthreads-2.1.7.dylib	/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib
+/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib	/opt/homebrew/opt/hwloc/lib/libhwloc.15.dylib	/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib

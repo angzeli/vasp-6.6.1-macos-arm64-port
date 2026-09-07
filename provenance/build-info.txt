@@ -1,0 +1,26 @@
+source=/Applications/Academic/vasp.6.6.1
+ProductName:		macOS
+ProductVersion:		26.3
+BuildVersion:		25D125
+GNU Fortran (Homebrew GCC 16.1.0) 16.1.0
+gcc-16 (Homebrew GCC 16.1.0) 16.1.0
+mpirun (Open MPI) 5.0.9
+/opt/homebrew/Cellar/gcc/16.1.0/bin/gfortran
+-I/opt/homebrew/Cellar/open-mpi/5.0.9/include -Wl,-flat_namespace -I/opt/homebrew/Cellar/open-mpi/5.0.9/lib -L/opt/homebrew/Cellar/open-mpi/5.0.9/lib -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi
+GNU Make 4.4.1
+/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblas.dylib: Mach-O 64-bit dynamically linked shared library arm64
+/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.dylib: Mach-O 64-bit dynamically linked shared library arm64
+/opt/homebrew/Cellar/fftw/3.3.11/lib/libfftw3.dylib: Mach-O 64-bit dynamically linked shared library arm64
+Fortran wrapper selection and required dependency files: PASS
+VASP source self-identity: 6.6.1 (17Jul2026)
+Source: /Applications/Academic/vasp.6.6.1
+Official archive provenance not independently authenticated.
+Start UTC: 2026-09-07T02:40:24.882773+00:00
+All std/gam/ncl builds completed 2026-09-07, using two compile jobs per variant.
+No source edits or source patches. Private before/after build-input fingerprint matches.
+Upstream bin/build remain empty; no upstream makefile.include was created.
+
+variant	build_seconds	warning_lines_retained	binary_bytes
+std	247	1047	16984904
+gam	241	1151	16763736
+ncl	242	967	17034680

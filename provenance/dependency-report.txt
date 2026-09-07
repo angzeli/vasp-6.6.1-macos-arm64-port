@@ -1,0 +1,23 @@
+All three executables: native Mach-O arm64.
+18 native images checked per binary; identical non-system dependency closures.
+No unresolved dependency or x86-only image. OpenMPI 5 / GCC 16 selected.
+Compiler/runtime library install names use Homebrew opt symlinks; reproducibility depends on retaining those versions.
+
+Resolved non-system library closure:
+/opt/homebrew/Cellar/fftw/3.3.11/lib/libfftw3.3.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgcc_s.1.1.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libgfortran.5.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libquadmath.0.dylib
+/opt/homebrew/Cellar/gcc/16.1.0/lib/gcc/current/libstdc++.6.dylib
+/opt/homebrew/Cellar/hwloc/2.13.0/lib/libhwloc.15.dylib
+/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_core-2.1.7.dylib
+/opt/homebrew/Cellar/libevent/2.1.13/lib/libevent_pthreads-2.1.7.dylib
+/opt/homebrew/Cellar/libomp/22.1.8/lib/libomp.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_mpifh.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempi_ignore_tkr.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libmpi_usempif08.40.dylib
+/opt/homebrew/Cellar/open-mpi/5.0.9/lib/libopen-pal.80.dylib
+/opt/homebrew/Cellar/openblas/0.3.34/lib/libopenblasp-r0.3.34.dylib
+/opt/homebrew/Cellar/pmix/6.1.0/lib/libpmix.2.dylib
+/opt/homebrew/Cellar/scalapack/2.2.3/lib/libscalapack.2.2.3.dylib
