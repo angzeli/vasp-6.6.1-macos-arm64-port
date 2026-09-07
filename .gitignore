@@ -1,6 +1,15 @@
 # All licensed staging, executables, calculations and raw logs stay local.
 /private/
 /macos-arm64/
+/build/
+/bin/
+# Source/potential archives must remain outside tracked paths.
+*.tar
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tgz
+*.zip
 **/POTCAR*
 **/potpaw*/
 **/src/

@@ -17,6 +17,7 @@ for name in filter(None,paths):
     contents=subprocess.check_output(['git','-C',str(root),'show',':'+name])
     if b'\0' in contents or len(contents)>200_000:
         raise SystemExit('Binary or unexpectedly large tracked file: '+name)
-for name in ['private/example.F','private/POTCAR','macos-arm64/build/std/main.F','macos-arm64/bin/vasp_std']:
+for name in ['private/example.F','private/POTCAR','macos-arm64/build/std/main.F','macos-arm64/bin/vasp_std',
+             'build/example.o', 'bin/vasp_std', 'private-source.tar.gz']:
     subprocess.run(['git','-C',str(root),'check-ignore','-q',name],check=True)
 print('Tracked files are limited to independent tooling/docs/metadata; private exclusions pass.')
