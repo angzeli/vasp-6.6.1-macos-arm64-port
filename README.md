@@ -108,7 +108,29 @@ cases. These instructions describe reconstruction; documentation changes do
 not require rebuilding. Existing build directories may be reused by the build
 wrapper, while validation refuses to overwrite an existing case directory.
 
-## Running MPI
+## Running a local calculation
+
+Use [`scripts/run-vasp.sh`](scripts/run-vasp.sh) to validate inputs, stage an
+independent new execution directory, and run an existing validated binary:
+
+```sh
+"/path/to/vasp-6.6.1-macos-arm64-port/scripts/run-vasp.sh" \
+  --input "/path/to/Si2 inputs" --output "/path/to/new Si2 run" \
+  --binary std --ranks 1 --timeout 60
+```
+
+The output parent must exist and the output itself must be new. Add `--dry-run`
+for a plan without files or MPI/VASP execution. Defaults are synthetic MPI, one
+rank, and no restart; NCORE/KPAR use explicit CLI values, then unambiguous INCAR
+values, then 1. A real run requires an explicit timeout.
+
+Read the [launcher guide](docs/LAUNCHER.md) for restart staging, supported input
+syntax, stop/checkpoint semantics and exact local examples. The
+[launcher validation report](validation/reports/LAUNCHER_VALIDATION.md) records
+15 deterministic tests and bounded Si2 runs. This interface has no scheduler,
+installation layer or automatic retry; process completion is not SCF convergence.
+
+## Running MPI directly
 
 Run the launcher from a calculation directory containing your authorized inputs:
 
@@ -200,7 +222,8 @@ files. No GitHub Actions workflow is currently included in this repository.
 | Area | Role |
 | --- | --- |
 | `config/` | Independently authored, explicitly pinned VASP-6 build configuration |
-| `scripts/` | Build, dependency audit, MPI, validation and repository-safety tooling |
+| `scripts/` | Build, dependency audit, local calculation runner, MPI and validation tooling |
+| `tests/` | Deterministic launcher safety tests without VASP execution |
 | `validation/reports/` | Safe retained numerical summaries |
 | `provenance/` | Build identity, executable hashes and dependency metadata |
 | `docs/` | Build, validation and factual port-history guides |
@@ -210,6 +233,8 @@ files. No GitHub Actions workflow is currently included in this repository.
 
 ## Documentation
 
+- [Local calculation launcher](docs/LAUNCHER.md)
+- [Launcher validation](validation/reports/LAUNCHER_VALIDATION.md)
 - [Build workflow and MPI launcher](docs/BUILD.md)
 - [Validation definitions and tolerances](docs/VALIDATION.md)
 - [Measured validation results](VALIDATION_REPORT.md)
