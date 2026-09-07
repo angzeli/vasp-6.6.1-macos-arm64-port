@@ -5,7 +5,7 @@ import subprocess
 
 root=Path(__file__).resolve().parent.parent
 paths=subprocess.check_output(['git','-C',str(root),'ls-files','-z']).decode().split('\0')
-allowed_roots={'config','scripts','docs','provenance','validation'}
+allowed_roots={'config','scripts','docs','provenance','validation','tests'}
 allowed_suffixes={'.md','.txt','.tsv','.sh','.py'}
 for name in filter(None,paths):
     path=Path(name)
