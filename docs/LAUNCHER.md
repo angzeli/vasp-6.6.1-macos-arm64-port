@@ -16,7 +16,7 @@ execution budget and defaults to synthetic MPI.
 
 This is local-only execution. There is no queue, remote submission, daemon, retry,
 automatic tuning, arbitrary-program option or in-place resume. A later scheduler
-could invoke this CLI; no scheduler integration is implemented here.
+can invoke this CLI through the explicit managed contract below.
 
 ## Options
 
@@ -33,6 +33,7 @@ could invoke this CLI; no scheduler integration is implemented here.
 | `--timeout SECONDS` | Positive finite execution budget, required for a real launch |
 | `--stop-before SECONDS` | `0` (disabled); nonnegative and smaller than timeout |
 | `--extra-input BASENAME` | Repeatable, explicitly named regular auxiliary input |
+| `--managed-foreground` | Remain the sole foreground payload in an explicitly owned CMW Jobs session |
 | `--dry-run` | Validate/print the resolved plan; creates no files and starts no MPI/VASP |
 | `--help` | CLI help |
 
@@ -40,6 +41,39 @@ Dry-run performs read-only binary identity, file/header and space checks. It may
 read substantial CHGCAR data; it is not a scientific correctness check. MPI version
 is probed immediately before real staging. Runtime banner identity is checked
 after execution, without treating the VASP executable as a version utility.
+
+## CMW managed foreground
+
+The opt-in route requires `CMW_JOBS_OWN_SESSION=1` on the Jobs submission and a
+CMW version whose shared `signal_session` supports `include_leader=False`.
+`CMW_MANAGED_PYTHON` may select the interpreter that provides that CMW installation;
+the shell forwards every argument without adding a second wrapper. The port has
+no `--threads` option: the shell's existing three thread limits remain one.
+
+Before launch the dedicated session must contain only the Jobs payload leader
+and the foreground port process. Pre-existing siblings cause refusal. MPI starts
+in a separate process group within that session. The port waits for supported
+same-session subgroups even after the launcher exits. Local timeout/interruption
+cleanup uses CMW's birth-verified session signalling while excluding the protected
+Jobs leader group. TERM is followed by bounded KILL escalation and verified
+subgroup drainage. An uncertain identity or surviving subgroup is unresolved,
+never successful completion. CMW retains outer cancellation authority; neither
+its controller nor supervisor is a local port signal target. New-session escapes
+are unsupported. This restricted sole-payload contract grants no general authority
+over arbitrary siblings or external processes.
+
+Use explicit input/output, ranks, NCORE/KPAR, restart and budget arguments. Source
+inputs remain unchanged; metadata records the original input, new output, managed
+mode, staged hashes, effective INCAR and terminal status/timestamps. CMW produces
+its own genuine attempt receipt. `--stop-before 0` records `advance_stop: disabled`
+and prevents the checkpoint callback; it does not disable the hard deadline.
+
+Portable `test_cmw_foreground` cases exercise this actual shell and runner with
+explicit test-only substitutes for binary/MPI discovery and caffeinate. They require
+a qualified CMW checkout and its test helpers on `PYTHONPATH`. They establish the
+synthetic contract, not real OpenMPI/VASP qualification. Standalone defaults remain
+unchanged; historical standalone leaderless cleanup limitations are not resolved
+by the managed route. Never infer rollout authorization from these tests.
 
 ## Staging and parallel controls
 

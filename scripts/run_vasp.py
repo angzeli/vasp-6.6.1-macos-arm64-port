@@ -305,10 +305,16 @@ def parser():
     p.add_argument('--stop-before',type=float,default=0,help='request STOPCAR this many seconds before hard timeout')
     p.add_argument('--extra-input',action='append',default=[],metavar='BASENAME')
     p.add_argument('--dry-run',action='store_true')
+    p.add_argument('--managed-foreground',action='store_true',
+                   help='remain CMW foreground payload; drain child subgroups while protecting the supervisor group')
     return p
 
 
 def plan(args):
+    if args.managed_foreground and not args.dry_run:
+        require(os.getpgrp() != os.getpid() and os.getsid(0) == os.getpgrp()
+                and os.environ.get('CMW_JOBS_OWN_SESSION') == '1',
+                'Managed foreground requires an inherited dedicated CMW session')
     require(1<=args.ranks<=8, 'Supported rank range is 1..8')
     require(args.timeout is not None or args.dry_run, 'A real launch requires explicit --timeout SECONDS')
     require(args.timeout is None or math.isfinite(args.timeout) and args.timeout>0, '--timeout must be positive and finite')
@@ -411,7 +417,8 @@ def plan(args):
     sizes=snapshots
     needed=sum(s[2] for s in sizes.values())+len(effective.encode())+65536
     require(shutil.disk_usage(output.parent).free>=needed, 'Insufficient free space to stage selected files (runtime output needs additional space)')
-    command,env=launch.mpi_command([str(binary)],args.ranks,args.mpi_mode)
+    command,env=launch.mpi_command([str(binary)],args.ranks,args.mpi_mode,
+                                 **({'managed_foreground': True} if args.managed_foreground else {}))
     return dict(args=args,source=source,output=output,donor=donor,files=files,identities=sizes,
                 incar=incar,effective=effective,changes=changes,parallel=parallel,origins=origins,
                 binary=binary,sha=sha,binary_stat=identity(binary),command=command,env=env,bytes=needed,warnings=warnings,
@@ -516,6 +523,7 @@ def execute(p):
         note('command',shlex.join(p['command']))
         note('threads',{k:p['env'].get(k) for k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OMPI_FC','HWLOC_SYNTHETIC')})
         note('hard_budget_seconds',a.timeout);note('stop_before_seconds',a.stop_before)
+        note('managed_foreground',a.managed_foreground)
         note('restart_requested',a.restart);note('restart_preflight',p['restart_checks'])
         note('warnings',p['warnings']);note('incar_overrides',p['changes'])
         for name,path in p['files'].items():
@@ -544,7 +552,8 @@ def execute(p):
         note('state','RUNNING')
         with (out/'stdout.log').open('x') as stdout, (out/'stderr.log').open('x') as stderr:
             result=launch.supervise(p['command'],a.timeout,cwd=out,env=p['env'],stdout=stdout,stderr=stderr,
-                                    stop_before=a.stop_before,on_stop=stop,awake=True)
+                                    stop_before=a.stop_before,on_stop=stop,awake=True,
+                                    managed_foreground=a.managed_foreground)
         for key,value in result.items(): note(key,value)
         evidence,version_ok,rejected=output_evidence(p)
         for key,value in evidence.items(): note(key,value)

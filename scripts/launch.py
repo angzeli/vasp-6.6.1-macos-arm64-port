@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime, timezone, timedelta
 import math
+import inspect
 import os
 import signal
 import subprocess
@@ -12,7 +13,7 @@ import time
 MPI = '/opt/homebrew/Cellar/open-mpi/5.0.9/bin/mpirun'
 
 
-def mpi_command(program, ranks, mode):
+def mpi_command(program, ranks, mode, *, managed_foreground=False):
     if not 1 <= ranks <= 8 or mode not in ('native', 'synthetic'):
         raise ValueError('ranks must be 1..8; mode must be native or synthetic')
     env = os.environ.copy()
@@ -23,11 +24,13 @@ def mpi_command(program, ranks, mode):
         cores = int(subprocess.check_output(['/usr/sbin/sysctl', '-n', 'hw.physicalcpu'], text=True))
         env['HWLOC_SYNTHETIC'] = f'Package:1 Core:{cores} PU:1'
         command += ['--bind-to', 'none', '--map-by', 'slot']
+    # Preserve MPI's rank groups. Opt-in CMW ownership covers the dedicated
+    # session, not just the outer launcher group.
     return command + list(program), env
 
 
 def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
-              stop_before=0, on_stop=None, awake=False, grace=10):
+              stop_before=0, on_stop=None, awake=False, grace=10, managed_foreground=False):
     """Own one session, forward INT/TERM, enforce a deadline and reap the leader.
 
     Internal command injection supports synthetic tests, not a public CLI option.
@@ -35,6 +38,18 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
     """
     if not math.isfinite(timeout) or timeout <= 0 or not 0 <= stop_before < timeout:
         raise ValueError('timeout must be positive; 0 <= stop-before < timeout')
+    managed_group = os.getpgrp() if managed_foreground else None
+    if managed_foreground and (managed_group == os.getpid() or os.getsid(0) != managed_group
+                               or os.environ.get("CMW_JOBS_OWN_SESSION") != "1"):
+        raise ValueError('Managed foreground requires an inherited dedicated session/process group')
+    if managed_foreground:
+        from cmw.jobs.ownership import identity, owner_alive, group_members, signal_session
+        if "include_leader" not in inspect.signature(signal_session).parameters:
+            raise ValueError('Managed mode requires CMW protected-leader subgroup cleanup support')
+        managed_owner = identity(managed_group)
+        members = set(group_members(managed_group, session=True))
+        if not owner_alive(managed_owner) or members != {managed_group, os.getpid()}:
+            raise ValueError(f'Managed mode requires the sole foreground payload in a dedicated CMW session (leader={managed_group}, payload={os.getpid()}, members={sorted(members)})')
     requested = []
     previous = {}
     process = inhibitor = None
@@ -59,7 +74,40 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
         except ProcessLookupError:
             pass
 
+    def managed_members():
+        if not owner_alive(managed_owner) or os.getsid(0) != managed_group or os.getpgrp() != managed_group:
+            raise RuntimeError('Managed session authority changed; no local signal authorized')
+        protected = {managed_group, os.getpid()}
+        if inhibitor is not None:
+            protected.add(inhibitor.pid)
+        members = [pid for pid in group_members(managed_group, session=True) if pid not in protected]
+        for pid in members:
+            try:
+                if os.getpgid(pid) == managed_group:
+                    raise RuntimeError('Unexpected member in protected CMW leader group; drainage unresolved')
+            except ProcessLookupError:
+                pass
+        return members
+
     def cleanup():
+        if managed_foreground:
+            # Exclusive foreground topology is checked before launch. CMW retains
+            # its leader group; shared birth checks authorize only child groups.
+            if managed_members():
+                signal_session(managed_owner, signal.SIGTERM, include_leader=False)
+            end = time.monotonic() + grace
+            while managed_members() and time.monotonic() < end:
+                process.poll()
+                time.sleep(.05)
+            if managed_members():
+                signal_session(managed_owner, signal.SIGKILL, include_leader=False)
+            process.wait(timeout=grace)
+            end = time.monotonic() + grace
+            while managed_members() and time.monotonic() < end:
+                time.sleep(.05)
+            if managed_members():
+                raise RuntimeError('Managed descendants remain; completion is unresolved')
+            return
         if not group_exists():
             process.wait()
             return
@@ -74,6 +122,7 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
             send_group(signal.SIGKILL)
         process.wait()
 
+    cleanup_entered = False
     try:
         for sig in (signal.SIGINT, signal.SIGTERM):
             previous[sig] = signal.signal(sig, receive)
@@ -81,7 +130,8 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
         started = time.monotonic()
         start_utc = datetime.now(timezone.utc).isoformat()
         process = subprocess.Popen(command, cwd=cwd, env=env, stdout=stdout,
-                                   stderr=stderr, start_new_session=True)
+                                   stderr=stderr, start_new_session=not managed_foreground,
+                                   preexec_fn=os.setpgrp if managed_foreground else None)
         if awake:
             inhibitor = subprocess.Popen(['/usr/bin/caffeinate', '-i', '-w', str(os.getpid())],
                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -91,7 +141,7 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
                 reason = signal.Signals(requested[0]).name
                 status = 128 + requested[0]
                 break
-            if child is not None:
+            if child is not None and (not managed_foreground or not managed_members()):
                 status = child if child >= 0 else 128 - child
                 break
             elapsed = time.monotonic() - started
@@ -101,10 +151,11 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
             if stop_before and stop_note == 'not reached' and elapsed >= timeout - stop_before:
                 stop_note = str(on_stop()) if on_stop else 'no stop callback'
             time.sleep(min(0.1, timeout - elapsed))
-        if reason != 'completed' or group_exists():
+        if reason != 'completed' or (not managed_foreground and group_exists()):
+            cleanup_entered = True
             cleanup()
     except BaseException:
-        if process is not None:
+        if process is not None and not cleanup_entered:
             cleanup()
         raise
     finally:
