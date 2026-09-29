@@ -175,12 +175,14 @@ host needs synthetic OpenMPI topology; native mode has not been revalidated here
 ## Deadline, checkpoint and completion semantics
 
 The hard execution budget starts when MPI is launched, after staging. At the
-deadline, SIGINT or SIGTERM, the single supervisor terminates only its owned
+deadline, SIGINT or SIGTERM, standalone mode terminates only its owned
 process group, gives it up to 10 seconds of cleanup grace, then escalates to
 SIGKILL if needed and reaps its direct child. Deadline enforcement can therefore
 be followed by bounded cleanup time. Existing outputs are retained; there is no
 retry or mode switch. Descendants that deliberately detach from the owned process
-group are outside the supervisor contract; ordinary MPI ranks stay in that group.
+group are outside that standalone contract; rank topology must not be assumed.
+Managed mode instead uses the explicit same-session subgroup and protected-leader
+contract described above.
 
 With `--stop-before`, the launcher exclusively creates STOPCAR before the deadline:
 LABORT for static work (next electronic boundary), LSTOP for NSW>0 (next ionic
