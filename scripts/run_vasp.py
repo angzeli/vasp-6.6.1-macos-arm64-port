@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import io
+import json
 import math
 import os
 from pathlib import Path
@@ -302,6 +303,10 @@ def parser():
     p.add_argument('--restart',choices=tuple(RESTARTS),default='none')
     p.add_argument('--restart-from',type=Path)
     p.add_argument('--timeout',type=float,help='positive execution budget; required for real launch')
+    p.add_argument('--controlled-suspension', action='store_true',
+                   help='enrol this new managed attempt in the versioned CMW suspension protocol')
+    p.add_argument('--execution-budget', type=float,
+                   help='pause-aware execution seconds; requires --controlled-suspension; --timeout remains hard')
     p.add_argument('--stop-before',type=float,default=0,help='request STOPCAR this many seconds before hard timeout')
     p.add_argument('--extra-input',action='append',default=[],metavar='BASENAME')
     p.add_argument('--dry-run',action='store_true')
@@ -311,6 +316,16 @@ def parser():
 
 
 def plan(args):
+    require(not args.controlled_suspension or args.managed_foreground,
+            'Controlled suspension requires --managed-foreground')
+    require(args.execution_budget is None or args.controlled_suspension,
+            '--execution-budget requires --controlled-suspension')
+    if args.controlled_suspension:
+        require(args.execution_budget is not None and math.isfinite(args.execution_budget) and args.execution_budget > 0,
+                'Controlled suspension requires a positive finite --execution-budget')
+        require(args.stop_before == 0, 'Controlled suspension requires --stop-before 0; STOPCAR is not suspension')
+    require(args.controlled_suspension or 'CMW_SUSPENSION_CONTEXT' not in os.environ,
+            'A suspension context requires the explicit --controlled-suspension runner contract')
     if args.managed_foreground and not args.dry_run:
         require(os.getpgrp() != os.getpid() and os.getsid(0) == os.getpgrp()
                 and os.environ.get('CMW_JOBS_OWN_SESSION') == '1',
@@ -418,7 +433,8 @@ def plan(args):
     needed=sum(s[2] for s in sizes.values())+len(effective.encode())+65536
     require(shutil.disk_usage(output.parent).free>=needed, 'Insufficient free space to stage selected files (runtime output needs additional space)')
     command,env=launch.mpi_command([str(binary)],args.ranks,args.mpi_mode,
-                                 **({'managed_foreground': True} if args.managed_foreground else {}))
+                                 **({'managed_foreground': True} if args.managed_foreground else {}),
+                                 **({'controlled_suspension': True} if args.controlled_suspension else {}))
     return dict(args=args,source=source,output=output,donor=donor,files=files,identities=sizes,
                 incar=incar,effective=effective,changes=changes,parallel=parallel,origins=origins,
                 binary=binary,sha=sha,binary_stat=identity(binary),command=command,env=env,bytes=needed,warnings=warnings,
@@ -441,6 +457,8 @@ def describe(p):
     print(f"Input: {p['source']}\nOutput (new): {p['output']}\nBinary: {p['binary']}\nSHA-256: {p['sha']}\nRequested version: 6.6.1")
     print('MPI command:',shlex.join(p['command']))
     print(f'MPI mode: {a.mpi_mode}; ranks={a.ranks}; timeout={a.timeout if a.timeout is not None else "NOT SET; required for execution"}; stop-before={a.stop_before}')
+    if a.controlled_suspension:
+        print(f'Controlled suspension: pause-aware execution budget={a.execution_budget}s; hard budget={a.timeout}s; no power assertion; native engine and sleep unqualified')
     print('Environment:',{k:p['env'].get(k) for k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','OMPI_FC','HWLOC_SYNTHETIC')})
     print('Stage only:',', '.join(f'{n} ({s[2]} bytes)' for n,s in p['identities'].items()))
     print(f"Staging space estimate: {p['bytes']} bytes; additional runtime output space is not estimated")
@@ -501,8 +519,26 @@ def execute(p):
     # MPI version is a read-only utility probe, never invoked by --dry-run.
     mpi_version=subprocess.check_output([launch.MPI,'--version'],text=True).splitlines()[0]
     require('5.0.9' in mpi_version, 'MPI version differs from the recorded port')
-    provenance=(git_identity(ROOT),git_identity(p['source']))
-    out.mkdir(mode=0o700)  # exclusive ownership; no parents and no exist_ok
+    control = None
+    if a.controlled_suspension:
+        from cmw.jobs.suspension_protocol import RunnerControl, clock_descriptor, mpi_runtime_identity
+        control = RunnerControl.from_environment('vasp-port-v1',
+            deadline={'hard_timeout_seconds': a.timeout, 'execution_budget_seconds': a.execution_budget,
+                      'advance_stop_seconds': 0, 'known': True, 'clock': clock_descriptor()},
+            storage=[str(path) for path in (p['source'], out.parent, p['binary'].parent, Path(launch.MPI).parent, Path(launch.PRTED).parent)],
+            runtime={**mpi_runtime_identity(launch.MPI, a.ranks),
+                     'mpi_mode': a.mpi_mode, 'local_only': True, 'power_assertion': 'none',
+                     'native_engine_qualified': False, 'sleep_qualified': False})
+        require(control is not None, 'Controlled suspension requires a verified CMW worker handshake')
+    try:
+        provenance=(git_identity(ROOT),git_identity(p['source']))
+        out.mkdir(mode=0o700)  # exclusive ownership; no parents and no exist_ok
+        if control is not None:
+            control.require_storage([str(out)])
+    except BaseException:
+        if control is not None:
+            control.close()
+        raise
 
     def note(key,value):
         meta.write(f'{key}: {value}\n');meta.flush()
@@ -524,6 +560,13 @@ def execute(p):
         note('threads',{k:p['env'].get(k) for k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OMPI_FC','HWLOC_SYNTHETIC')})
         note('hard_budget_seconds',a.timeout);note('stop_before_seconds',a.stop_before)
         note('managed_foreground',a.managed_foreground)
+        if control is not None:
+            note('runner_metadata_version',2)
+            note('controlled_suspension_protocol','cmw-suspension-v1')
+            note('deadline_policy','pause-aware-execution-v1')
+            note('execution_budget_seconds',a.execution_budget)
+            note('deadline_clock',json.dumps(clock_descriptor(),sort_keys=True,separators=(',', ':')))
+            note('power_assertion','none')
         note('restart_requested',a.restart);note('restart_preflight',p['restart_checks'])
         note('warnings',p['warnings']);note('incar_overrides',p['changes'])
         for name,path in p['files'].items():
@@ -552,9 +595,11 @@ def execute(p):
         note('state','RUNNING')
         with (out/'stdout.log').open('x') as stdout, (out/'stderr.log').open('x') as stderr:
             result=launch.supervise(p['command'],a.timeout,cwd=out,env=p['env'],stdout=stdout,stderr=stderr,
-                                    stop_before=a.stop_before,on_stop=stop,awake=True,
-                                    managed_foreground=a.managed_foreground)
-        for key,value in result.items(): note(key,value)
+                                    stop_before=a.stop_before,on_stop=stop,awake=control is None,
+                                    managed_foreground=a.managed_foreground,
+                                    **({'control': control, 'execution_budget': a.execution_budget} if control is not None else {}))
+        for key,value in result.items():
+            note(key,json.dumps(value,sort_keys=True,separators=(',', ':')) if key == 'suspension_intervals' else value)
         evidence,version_ok,rejected=output_evidence(p)
         for key,value in evidence.items(): note(key,value)
         status=result['status']
@@ -576,6 +621,7 @@ def execute(p):
         print(f'Launcher failed; retained {out}: {error}',file=sys.stderr)
         return status
     finally:
+        if control is not None: control.close()
         if meta: meta.close()
         for sig,handler in previous.items(): signal.signal(sig,handler)
 

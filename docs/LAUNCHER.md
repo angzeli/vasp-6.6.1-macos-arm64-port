@@ -30,7 +30,9 @@ can invoke this CLI through the explicit managed contract below.
 | `--mpi-mode synthetic\|native` | `synthetic`; native is explicit diagnostics, without fallback |
 | `--restart none\|wavecar\|chgcar\|both` | `none`; deliberate restart-file selection |
 | `--restart-from PATH` | Defaults to input for a selected restart; invalid with `none` |
-| `--timeout SECONDS` | Positive finite execution budget, required for a real launch |
+| `--timeout SECONDS` | Positive finite hard execution budget, required for a real launch |
+| `--controlled-suspension` | Explicit new managed-attempt protocol enrolment; unavailable for legacy attempts |
+| `--execution-budget SECONDS` | Positive pause-aware budget; requires controlled suspension; hard timeout remains independent |
 | `--stop-before SECONDS` | `0` (disabled); nonnegative and smaller than timeout |
 | `--extra-input BASENAME` | Repeatable, explicitly named regular auxiliary input |
 | `--managed-foreground` | Remain the sole foreground payload in an explicitly owned CMW Jobs session |
@@ -263,3 +265,51 @@ this launcher contract on this Mac. They do not approve a ZnIn2S4 workflow, dens
 hybrid production, general restart compatibility, ionic relaxation or checkpoint
 recovery after abrupt termination. Existing port-level scientific validation and
 its limitations remain in [VALIDATION_REPORT.md](../VALIDATION_REPORT.md).
+
+## Controlled Suspend/Continue (new managed attempts only)
+
+The opt-in invocation adds `--controlled-suspension --execution-budget SECONDS`
+to the existing fully explicit `--managed-foreground` route. It requires the
+matching CMW `vasp-port-v1` backend and protocol 1 private worker handshake;
+an environment string alone grants no control. Legacy attempts cannot enrol.
+Standalone launches and existing argument meanings are unchanged.
+
+`--timeout` remains an independent hard budget. The new execution budget uses
+CMW's boot-bound continuous clock (`mach_continuous_time` on macOS or
+`CLOCK_BOOTTIME` on Linux), excluding only worker-verified suspended intervals.
+Transition time still counts. The fixed hard deadline is never extended; expiry
+asks the owning worker for termination and waits for genuine child exit and
+subgroup drainage. The runner does not run a second signal controller.
+`--stop-before 0` is mandatory: suspension never creates STOPCAR.
+
+This route is limited to the pinned local Open MPI 5.0.9 / PRRTE 4.1.0 launch,
+1–8 ranks, explicit localhost placement, and the existing single-image input
+restrictions. Inherited MPI/PMIx overrides and scheduler allocation variables
+are refused. MPI controls stay runnable while the worker forwards the qualified
+SIGTSTP/SIGCONT operation through the launcher and verifies computational members.
+The supervisor remains runnable, retains the same attempt, and never treats a
+stopped child as exited. A request alone is not verified suspension; unavailable
+worker/deadline/storage evidence remains an unresolved held domain.
+
+The controlled route creates no caffeinate assertion. An attempt with an
+unsupported existing assertion is not enrolled. It changes no global power
+setting. Neither this option nor synthetic/native-MPI tests qualify a scientific
+engine, physical sleep/wake, lid closing, reboot, logout or disk disconnection.
+Required storage, source paths, MPI session files and memory must remain available.
+Continue is explicit; there is no timed automatic continuation or restart.
+
+Enrolled `RUN_METADATA.txt` uses explicit `runner_metadata_version: 2`, the
+`cmw-suspension-v1` contract, separate execution/hard budgets, clock provenance,
+and closed confirmed intervals. CMW's `vasp-run-metadata-text-v2` consumer retains
+all original source, input, receipt, native-result and finalization checks. Old
+unversioned records continue to use `vasp-run-metadata-text-v1`. Suspension history
+never converts timeout, cancellation, failure or missing scientific evidence into
+successful finalization.
+
+Portable `test_controlled_suspend` covers protocol options, hard/active budget
+separation and live stopped-child handling with deterministic model processes.
+`tests/native_mpi_fixture.py` is an explicitly selected acceptance shim for a
+compiled harmless MPI communication program; only binary discovery is replaced,
+with optional visibly invented output for binding checks. It uses the actual
+candidate plan, staging, MPI command, supervisor and CMW controls. It is not a
+scientific engine test and is not automatically run by ordinary CI.

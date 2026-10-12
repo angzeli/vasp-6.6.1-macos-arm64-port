@@ -11,15 +11,25 @@ import sys
 import time
 
 MPI = '/opt/homebrew/Cellar/open-mpi/5.0.9/bin/mpirun'
+PRTED = '/opt/homebrew/Cellar/prrte/4.1.0/bin/prted'
 
 
-def mpi_command(program, ranks, mode, *, managed_foreground=False):
+
+def mpi_command(program, ranks, mode, *, managed_foreground=False, controlled_suspension=False):
     if not 1 <= ranks <= 8 or mode not in ('native', 'synthetic'):
         raise ValueError('ranks must be 1..8; mode must be native or synthetic')
     env = os.environ.copy()
     env.pop('HWLOC_SYNTHETIC', None)
     env.update(OMP_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1')
     command = [MPI, '-np', str(ranks)]
+    if controlled_suspension:
+        if not managed_foreground:
+            raise ValueError('Controlled suspension requires managed foreground ownership')
+        inherited = sorted(key for key in env if key.startswith(('OMPI_MCA_', 'PRTE_MCA_', 'PMIX_MCA_',
+                                                                 'SLURM_', 'PBS_', 'SGE_', 'LSB_')))
+        if inherited:
+            raise ValueError('Controlled suspension refuses inherited MPI/scheduler overrides: ' + ', '.join(inherited))
+        command += ['--host', f'localhost:{ranks}', '--forward-signals', 'SIGTSTP,SIGCONT']
     if mode == 'synthetic':
         cores = int(subprocess.check_output(['/usr/sbin/sysctl', '-n', 'hw.physicalcpu'], text=True))
         env['HWLOC_SYNTHETIC'] = f'Package:1 Core:{cores} PU:1'
@@ -30,7 +40,8 @@ def mpi_command(program, ranks, mode, *, managed_foreground=False):
 
 
 def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
-              stop_before=0, on_stop=None, awake=False, grace=10, managed_foreground=False):
+              stop_before=0, on_stop=None, awake=False, grace=10, managed_foreground=False,
+              control=None, execution_budget=None):
     """Own one session, forward INT/TERM, enforce a deadline and reap the leader.
 
     Internal command injection supports synthetic tests, not a public CLI option.
@@ -38,6 +49,10 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
     """
     if not math.isfinite(timeout) or timeout <= 0 or not 0 <= stop_before < timeout:
         raise ValueError('timeout must be positive; 0 <= stop-before < timeout')
+    if control is not None and (not managed_foreground or awake or stop_before):
+        raise ValueError('Controlled suspension requires managed foreground, no advance stop, and no power assertion')
+    if execution_budget is not None and (control is None or not math.isfinite(execution_budget) or execution_budget <= 0):
+        raise ValueError('Pause-aware execution budget requires a coordinated control and a positive finite budget')
     managed_group = os.getpgrp() if managed_foreground else None
     if managed_foreground and (managed_group == os.getpid() or os.getsid(0) != managed_group
                                or os.environ.get("CMW_JOBS_OWN_SESSION") != "1"):
@@ -132,31 +147,52 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
         process = subprocess.Popen(command, cwd=cwd, env=env, stdout=stdout,
                                    stderr=stderr, start_new_session=not managed_foreground,
                                    preexec_fn=os.setpgrp if managed_foreground else None)
+        if control is not None:
+            control.register(process.pid, strategy='openmpi')
         if awake:
             inhibitor = subprocess.Popen(['/usr/bin/caffeinate', '-i', '-w', str(os.getpid())],
                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        terminating = False
         while True:
+            if control is not None:
+                control.poll()
             child = process.poll()
-            if requested:
+            if requested and not terminating:
                 reason = signal.Signals(requested[0]).name
                 status = 128 + requested[0]
-                break
+                if control is None:
+                    break
+                control.request_termination(reason, exit_code=status)
+                terminating = True
             if child is not None and (not managed_foreground or not managed_members()):
-                status = child if child >= 0 else 128 - child
+                if status is None:
+                    status = child if child >= 0 else 128 - child
                 break
-            elapsed = time.monotonic() - started
+            elapsed = control.elapsed if control is not None else time.monotonic() - started
+            if control is not None:
+                if not terminating and (elapsed >= timeout or control.execution_budget_exhausted(execution_budget)):
+                    reason, status = ('timeout' if elapsed >= timeout else 'execution-budget'), 124
+                    control.request_termination(reason, exit_code=status)
+                    terminating = True
+                # The worker alone controls computation and termination. A stopped
+                # child remains live; runner accounting and hard deadlines continue.
+                time.sleep(.05)
+                continue
             if elapsed >= timeout:
                 reason, status = 'timeout', 124
                 break
             if stop_before and stop_note == 'not reached' and elapsed >= timeout - stop_before:
                 stop_note = str(on_stop()) if on_stop else 'no stop callback'
             time.sleep(min(0.1, timeout - elapsed))
-        if reason != 'completed' or (not managed_foreground and group_exists()):
+        if control is None and (reason != 'completed' or (not managed_foreground and group_exists())):
             cleanup_entered = True
             cleanup()
     except BaseException:
         if process is not None and not cleanup_entered:
-            cleanup()
+            if control is None:
+                cleanup()
+            else:
+                control.request_termination('runner-error', exit_code=1)
         raise
     finally:
         if inhibitor is not None:
@@ -168,10 +204,15 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
                 inhibitor.wait()
         for sig, handler in previous.items():
             signal.signal(sig, handler)
-    return dict(status=status, child_status=process.returncode, reason=reason,
+    result = dict(status=status, child_status=process.returncode, reason=reason,
                 start_utc=start_utc, hard_deadline_utc=(datetime.fromisoformat(start_utc)+timedelta(seconds=timeout)).isoformat(), end_utc=datetime.now(timezone.utc).isoformat(),
-                elapsed_s=round(time.monotonic() - started, 6), pid=process.pid,
+                elapsed_s=round(control.elapsed if control is not None else time.monotonic() - started, 6), pid=process.pid,
                 advance_stop=stop_note)
+    if control is not None:
+        result.update(suspension_intervals=control.intervals,
+                      confirmed_suspended_seconds=control.suspended_seconds,
+                      unsuspended_elapsed_seconds=control.unsuspended_elapsed)
+    return result
 
 
 def main(argv=None):
