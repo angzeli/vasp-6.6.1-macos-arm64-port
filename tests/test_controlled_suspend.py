@@ -69,6 +69,7 @@ class CoordinatedSupervisorTests(unittest.TestCase):
             def suspended_seconds(self): return paused
             @property
             def unsuspended_elapsed(self): return self.elapsed - paused
+            def domain_drained(self): return process.returncode is not None
             def execution_budget_exhausted(self, budget): return self.unsuspended_elapsed >= budget
             def request_termination(self, reason, exit_code=124): self.termination = (reason, exit_code)
         control = Control()

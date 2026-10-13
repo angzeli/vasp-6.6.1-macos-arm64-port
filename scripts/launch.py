@@ -164,7 +164,8 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
                     break
                 control.request_termination(reason, exit_code=status)
                 terminating = True
-            if child is not None and (not managed_foreground or not managed_members()):
+            if child is not None and (control.domain_drained() if control is not None else
+                                      not managed_foreground or not managed_members()):
                 if status is None:
                     status = child if child >= 0 else 128 - child
                 break

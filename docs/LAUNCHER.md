@@ -282,6 +282,19 @@ asks the owning worker for termination and waits for genuine child exit and
 subgroup drainage. The runner does not run a second signal controller.
 `--stop-before 0` is mandatory: suspension never creates STOPCAR.
 
+For enrolled cancellation, CMW prepares the runner, then uses the qualified MPI
+launcher as the primary shutdown initiator. It observes the entire owned domain
+and may make one bounded, freshly verified fallback for surviving computation.
+The port runner does not race this with its own rank signals. Launcher exit alone
+does not permit finalization: the controlled supervisor delegates to CMW's shared
+strict drainage gate, retaining original process identities through exit and
+requiring computational groups to disappear. Zombies, inaccessible identities
+and ambiguous group observations keep completion unresolved. CMW preserves its
+protected anchor/runner controls until genuine receipt and normal RELEASE;
+standalone and unenrolled managed behavior remains unchanged. This operational
+sequence does not relax scientific result checks or establish native-engine or
+sleep qualification.
+
 This route is limited to the pinned local Open MPI 5.0.9 / PRRTE 4.1.0 launch,
 1–8 ranks, explicit localhost placement, and the existing single-image input
 restrictions. Inherited MPI/PMIx overrides and scheduler allocation variables
