@@ -57,6 +57,14 @@ Review the explicit paths before adapting the tooling to another machine.
 | FFTW | 3.3.11 |
 | GNU Make | 4.4.1 |
 
+The same M3 Max binaries were later revalidated, without rebuilding, on an
+Apple M5 Pro Mac mini (18 cores, 64 GB, macOS 27.2) with Homebrew GCC 16.2.0
+and OpenMPI 5.0.11 (ABI-compatible runtimes; OpenBLAS, ScaLAPACK and FFTW
+unchanged). The Si2 std fixture at 1/2/4 ranks and the gam, Γ-only std and
+ncl SOC fixtures reproduced the M3 Max TOTEN, Fermi level and eigenvalues
+exactly. Native MPI launch works on that host, so its `private/mpi-mode.txt`
+is `native`; the configuration paths now pin GCC 16.2.0 and OpenMPI 5.0.11.
+
 Compiler and dependency paths are explicit. The MPI Fortran wrapper is checked
 against the selected GCC 16 compiler, avoiding the unrelated shell-default
 GCC 14 / MPI 4 installation. Environment changes are process-local; no global

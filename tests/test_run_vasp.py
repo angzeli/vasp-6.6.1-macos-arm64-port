@@ -80,7 +80,7 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(runner.PreflightError):self.make()
         # A destination created by a competing claimant after preflight is untouched.
         (self.output/'sentinel').write_text('other owner')
-        with patch.object(runner,'git_identity',return_value='test'),patch.object(subprocess,'check_output',return_value='mpirun (Open MPI) 5.0.9\n'):
+        with patch.object(runner,'git_identity',return_value='test'),patch.object(subprocess,'check_output',return_value=f'mpirun (Open MPI) {runner.launch.MPI_VERSION}\n'):
             with self.assertRaises(FileExistsError):runner.execute(p)
         self.assertEqual(list(self.output.iterdir()),[self.output/'sentinel'])
 

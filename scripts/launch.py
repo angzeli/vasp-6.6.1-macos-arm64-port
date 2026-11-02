@@ -9,7 +9,8 @@ import subprocess
 import sys
 import time
 
-MPI = '/opt/homebrew/Cellar/open-mpi/5.0.9/bin/mpirun'
+MPI_VERSION = '5.0.11'
+MPI = f'/opt/homebrew/Cellar/open-mpi/{MPI_VERSION}/bin/mpirun'
 
 
 def mpi_command(program, ranks, mode, *, managed_foreground=False):

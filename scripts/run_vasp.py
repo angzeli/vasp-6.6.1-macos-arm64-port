@@ -576,7 +576,7 @@ def execute(p):
     out=p['output'];a=p['args'];meta=None;previous={};baseline={}
     # MPI version is a read-only utility probe, never invoked by --dry-run.
     mpi_version=subprocess.check_output([launch.MPI,'--version'],text=True).splitlines()[0]
-    require('5.0.9' in mpi_version, 'MPI version differs from the recorded port')
+    require(launch.MPI_VERSION in mpi_version, 'MPI version differs from the recorded port')
     provenance=(git_identity(ROOT),git_identity(p['source']))
     out.mkdir(mode=0o700)  # exclusive ownership; no parents and no exist_ok
 

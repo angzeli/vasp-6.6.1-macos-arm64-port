@@ -2,8 +2,8 @@
 # Process-local selection: never source this into a login profile.
 PORT_ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 PORT_SOURCE=/Applications/Academic/vasp.6.6.1
-PORT_GNU=/opt/homebrew/Cellar/gcc/16.1.0
-PORT_MPI=/opt/homebrew/Cellar/open-mpi/5.0.9
+PORT_GNU=/opt/homebrew/Cellar/gcc/16.2.0
+PORT_MPI=/opt/homebrew/Cellar/open-mpi/5.0.11
 PORT_MAKE=/opt/homebrew/bin/gmake
 export OMPI_FC="$PORT_GNU/bin/gfortran"
 export OMPI_CC="$PORT_GNU/bin/gcc-16"

@@ -1,7 +1,7 @@
 # Independently written configuration after inspecting the 6.6.1 GNU template.
 # MPI CPU build; no OpenMP, GPU, HDF5, qd, Libxc or external plugins.
-GNU_ROOT = /opt/homebrew/Cellar/gcc/16.1.0
-MPI_ROOT = /opt/homebrew/Cellar/open-mpi/5.0.9
+GNU_ROOT = /opt/homebrew/Cellar/gcc/16.2.0
+MPI_ROOT = /opt/homebrew/Cellar/open-mpi/5.0.11
 OPENBLAS_ROOT = /opt/homebrew/Cellar/openblas/0.3.34
 SCALAPACK_ROOT = /opt/homebrew/Cellar/scalapack/2.2.3
 FFTW_ROOT = /opt/homebrew/Cellar/fftw/3.3.11
