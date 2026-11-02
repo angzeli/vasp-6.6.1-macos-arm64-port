@@ -17,7 +17,7 @@ execution budget and takes its MPI mode from `--mpi-mode`, else the host-verifie
 
 This is local-only execution. There is no queue, remote submission, daemon, retry,
 automatic tuning, arbitrary-program option or in-place resume. A later scheduler
-could invoke this CLI; no scheduler integration is implemented here.
+can invoke this CLI through the explicit managed contract below.
 
 ## Options
 
@@ -31,9 +31,12 @@ could invoke this CLI; no scheduler integration is implemented here.
 | `--mpi-mode synthetic\|native` | `private/mpi-mode.txt` if present (must be `native` or `synthetic`), else `synthetic`; no automatic fallback |
 | `--restart none\|wavecar\|chgcar\|both` | `none`; deliberate restart-file selection |
 | `--restart-from PATH` | Defaults to input for a selected restart; invalid with `none` |
-| `--timeout SECONDS` | Positive finite execution budget, required for a real launch |
+| `--timeout SECONDS` | Positive finite hard execution budget, required for a real launch |
+| `--controlled-suspension` | Explicit new managed-attempt protocol enrolment; unavailable for legacy attempts |
+| `--execution-budget SECONDS` | Positive pause-aware budget; requires controlled suspension; hard timeout remains independent |
 | `--stop-before SECONDS` | `0` (disabled); nonnegative and smaller than timeout |
 | `--extra-input BASENAME` | Repeatable, explicitly named regular auxiliary input |
+| `--managed-foreground` | Remain the sole foreground payload in an explicitly owned CMW Jobs session |
 | `--dry-run` | Validate/print the resolved plan; creates no files and starts no MPI/VASP |
 | `--help` | CLI help |
 
@@ -41,6 +44,39 @@ Dry-run performs read-only binary identity, file/header and space checks. It may
 read substantial CHGCAR data; it is not a scientific correctness check. MPI version
 is probed immediately before real staging. Runtime banner identity is checked
 after execution, without treating the VASP executable as a version utility.
+
+## CMW managed foreground
+
+The opt-in route requires `CMW_JOBS_OWN_SESSION=1` on the Jobs submission and a
+CMW version whose shared `signal_session` supports `include_leader=False`.
+`CMW_MANAGED_PYTHON` may select the interpreter that provides that CMW installation;
+the shell forwards every argument without adding a second wrapper. The port has
+no `--threads` option: the shell's existing three thread limits remain one.
+
+Before launch the dedicated session must contain only the Jobs payload leader
+and the foreground port process. Pre-existing siblings cause refusal. MPI starts
+in a separate process group within that session. The port waits for supported
+same-session subgroups even after the launcher exits. Local timeout/interruption
+cleanup uses CMW's birth-verified session signalling while excluding the protected
+Jobs leader group. TERM is followed by bounded KILL escalation and verified
+subgroup drainage. An uncertain identity or surviving subgroup is unresolved,
+never successful completion. CMW retains outer cancellation authority; neither
+its controller nor supervisor is a local port signal target. New-session escapes
+are unsupported. This restricted sole-payload contract grants no general authority
+over arbitrary siblings or external processes.
+
+Use explicit input/output, ranks, NCORE/KPAR, restart and budget arguments. Source
+inputs remain unchanged; metadata records the original input, new output, managed
+mode, staged hashes, effective INCAR and terminal status/timestamps. CMW produces
+its own genuine attempt receipt. `--stop-before 0` records `advance_stop: disabled`
+and prevents the checkpoint callback; it does not disable the hard deadline.
+
+Portable `test_cmw_foreground` cases exercise this actual shell and runner with
+explicit test-only substitutes for binary/MPI discovery and caffeinate. They require
+a qualified CMW checkout and its test helpers on `PYTHONPATH`. They establish the
+synthetic contract, not real OpenMPI/VASP qualification. Standalone defaults remain
+unchanged; historical standalone leaderless cleanup limitations are not resolved
+by the managed route. Never infer rollout authorization from these tests.
 
 ## Staging and parallel controls
 
@@ -147,12 +183,14 @@ host needs synthetic OpenMPI topology; the M5 Pro host verified native launch.
 ## Deadline, checkpoint and completion semantics
 
 The hard execution budget starts when MPI is launched, after staging. At the
-deadline, SIGINT or SIGTERM, the single supervisor terminates only its owned
+deadline, SIGINT or SIGTERM, standalone mode terminates only its owned
 process group, gives it up to 10 seconds of cleanup grace, then escalates to
 SIGKILL if needed and reaps its direct child. Deadline enforcement can therefore
 be followed by bounded cleanup time. Existing outputs are retained; there is no
 retry or mode switch. Descendants that deliberately detach from the owned process
-group are outside the supervisor contract; ordinary MPI ranks stay in that group.
+group are outside that standalone contract; rank topology must not be assumed.
+Managed mode instead uses the explicit same-session subgroup and protected-leader
+contract described above.
 
 With `--stop-before`, the launcher exclusively creates STOPCAR before the deadline:
 LABORT for static work (next electronic boundary), LSTOP for NSW>0 (next ionic
@@ -233,3 +271,64 @@ this launcher contract on this Mac. They do not approve a ZnIn2S4 workflow, dens
 hybrid production, general restart compatibility, ionic relaxation or checkpoint
 recovery after abrupt termination. Existing port-level scientific validation and
 its limitations remain in [VALIDATION_REPORT.md](../VALIDATION_REPORT.md).
+
+## Controlled Suspend/Continue (new managed attempts only)
+
+The opt-in invocation adds `--controlled-suspension --execution-budget SECONDS`
+to the existing fully explicit `--managed-foreground` route. It requires the
+matching CMW `vasp-port-v1` backend and protocol 1 private worker handshake;
+an environment string alone grants no control. Legacy attempts cannot enrol.
+Standalone launches and existing argument meanings are unchanged.
+
+`--timeout` remains an independent hard budget. The new execution budget uses
+CMW's boot-bound continuous clock (`mach_continuous_time` on macOS or
+`CLOCK_BOOTTIME` on Linux), excluding only worker-verified suspended intervals.
+Transition time still counts. The fixed hard deadline is never extended; expiry
+asks the owning worker for termination and waits for genuine child exit and
+subgroup drainage. The runner does not run a second signal controller.
+`--stop-before 0` is mandatory: suspension never creates STOPCAR.
+
+For enrolled cancellation, CMW prepares the runner, then uses the qualified MPI
+launcher as the primary shutdown initiator. It observes the entire owned domain
+and may make one bounded, freshly verified fallback for surviving computation.
+The port runner does not race this with its own rank signals. Launcher exit alone
+does not permit finalization: the controlled supervisor delegates to CMW's shared
+strict drainage gate, retaining original process identities through exit and
+requiring computational groups to disappear. Zombies, inaccessible identities
+and ambiguous group observations keep completion unresolved. CMW preserves its
+protected anchor/runner controls until genuine receipt and normal RELEASE;
+standalone and unenrolled managed behavior remains unchanged. This operational
+sequence does not relax scientific result checks or establish native-engine or
+sleep qualification.
+
+This route is limited to the pinned local Open MPI 5.0.9 / PRRTE 4.1.0 launch,
+1–8 ranks, explicit localhost placement, and the existing single-image input
+restrictions. Inherited MPI/PMIx overrides and scheduler allocation variables
+are refused. MPI controls stay runnable while the worker forwards the qualified
+SIGTSTP/SIGCONT operation through the launcher and verifies computational members.
+The supervisor remains runnable, retains the same attempt, and never treats a
+stopped child as exited. A request alone is not verified suspension; unavailable
+worker/deadline/storage evidence remains an unresolved held domain.
+
+The controlled route creates no caffeinate assertion. An attempt with an
+unsupported existing assertion is not enrolled. It changes no global power
+setting. Neither this option nor synthetic/native-MPI tests qualify a scientific
+engine, physical sleep/wake, lid closing, reboot, logout or disk disconnection.
+Required storage, source paths, MPI session files and memory must remain available.
+Continue is explicit; there is no timed automatic continuation or restart.
+
+Enrolled `RUN_METADATA.txt` uses explicit `runner_metadata_version: 2`, the
+`cmw-suspension-v1` contract, separate execution/hard budgets, clock provenance,
+and closed confirmed intervals. CMW's `vasp-run-metadata-text-v2` consumer retains
+all original source, input, receipt, native-result and finalization checks. Old
+unversioned records continue to use `vasp-run-metadata-text-v1`. Suspension history
+never converts timeout, cancellation, failure or missing scientific evidence into
+successful finalization.
+
+Portable `test_controlled_suspend` covers protocol options, hard/active budget
+separation and live stopped-child handling with deterministic model processes.
+`tests/native_mpi_fixture.py` is an explicitly selected acceptance shim for a
+compiled harmless MPI communication program; only binary discovery is replaced,
+with optional visibly invented output for binding checks. It uses the actual
+candidate plan, staging, MPI command, supervisor and CMW controls. It is not a
+scientific engine test and is not automatically run by ordinary CI.
