@@ -32,10 +32,14 @@ inputs and generated executables remain local and excluded from Git.
 - Separately licensed potentials and local fixtures when running validation
 
 The current tooling is pinned to the validated machine's paths. The licensed
-source is `/Applications/Academic/vasp.6.6.1`; compiler and library prefixes are
-recorded in `scripts/environment.sh` and
-`config/makefile.include.macos-arm64`. These are not automatically discovered
-or interchangeable with the VASP-5 configuration.
+source is `/Applications/Academic/vasp.6.6.1`. Homebrew Cellar versions for
+GCC, OpenMPI, PRRTE, OpenBLAS, ScaLAPACK and FFTW are recorded in
+`config/toolchain-defaults.txt` (the original M3 Max toolchain); a host whose
+validated versions differ overrides them in the ignored
+`private/toolchain.env`, using the same `KEY=VALUE` lines.
+`scripts/toolchain.py` is the single reader used by `scripts/environment.sh`,
+the make configuration and the MPI launcher. These are not automatically
+discovered or interchangeable with the VASP-5 configuration.
 
 The validation harness reads existing authorized fixtures from
 `/Applications/Academic/vasp.5.4.4/macos-arm64/validation`. The beta comparison
@@ -63,7 +67,8 @@ and OpenMPI 5.0.11 (ABI-compatible runtimes; OpenBLAS, ScaLAPACK and FFTW
 unchanged). The Si2 std fixture at 1/2/4 ranks and the gam, Γ-only std and
 ncl SOC fixtures reproduced the M3 Max TOTEN, Fermi level and eigenvalues
 exactly. Native MPI launch works on that host, so its `private/mpi-mode.txt`
-is `native`; the configuration paths now pin GCC 16.2.0 and OpenMPI 5.0.11.
+is `native` and its `private/toolchain.env` selects GCC 16.2.0, OpenMPI
+5.0.11 and PRRTE 4.1.0_1.
 
 Compiler and dependency paths are explicit. The MPI Fortran wrapper is checked
 against the selected GCC 16 compiler, avoiding the unrelated shell-default

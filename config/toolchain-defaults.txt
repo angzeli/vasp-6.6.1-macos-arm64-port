@@ -1,0 +1,9 @@
+# Homebrew Cellar versions recorded for the original M3 Max port build.
+# A host whose validated toolchain differs puts the same KEY=VALUE lines in the
+# ignored private/toolchain.env; only the keys listed here are accepted there.
+PORT_GCC_VERSION=16.1.0
+PORT_OPENMPI_VERSION=5.0.9
+PORT_PRRTE_VERSION=4.1.0
+PORT_OPENBLAS_VERSION=0.3.34
+PORT_SCALAPACK_VERSION=2.2.3
+PORT_FFTW_VERSION=3.3.11

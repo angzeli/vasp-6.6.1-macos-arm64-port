@@ -301,7 +301,8 @@ standalone and unenrolled managed behavior remains unchanged. This operational
 sequence does not relax scientific result checks or establish native-engine or
 sleep qualification.
 
-This route is limited to the pinned local Open MPI 5.0.9 / PRRTE 4.1.0 launch,
+This route is limited to the pinned local Open MPI / PRRTE launch (versions from
+`config/toolchain-defaults.txt` or the host's `private/toolchain.env`),
 1–8 ranks, explicit localhost placement, and the existing single-image input
 restrictions. Inherited MPI/PMIx overrides and scheduler allocation variables
 are refused. MPI controls stay runnable while the worker forwards the qualified

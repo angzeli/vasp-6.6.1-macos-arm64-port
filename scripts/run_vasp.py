@@ -645,6 +645,7 @@ def execute(p):
         note('variant',a.binary);note('requested_version','6.6.1')
         note('launcher_repository',provenance[0]);note('input_repository',provenance[1])
         note('mpi',f'{launch.MPI}; {mpi_version}; mode={a.mpi_mode} (from {a.mpi_mode_source}); ranks={a.ranks}')
+        note('toolchain',f'{launch.TOOLCHAIN_SOURCE}; '+', '.join(f'{k}={v}' for k,v in launch.TOOLCHAIN.items()))
         note('command',shlex.join(p['command']))
         note('threads',{k:p['env'].get(k) for k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OMPI_FC','HWLOC_SYNTHETIC')})
         note('hard_budget_seconds',a.timeout);note('stop_before_seconds',a.stop_before)

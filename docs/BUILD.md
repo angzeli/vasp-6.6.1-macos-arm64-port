@@ -1,6 +1,6 @@
 # Building locally
 
-The build was designed for the installed paths on this Mac. Run `scripts/doctor.sh` before rebuilding. It verifies native host architecture, dependency files, and that the MPI Fortran wrapper selects GCC 16 rather than the shell-default older compiler/MPI chain. Compiler and runtime selection is process-local in `scripts/environment.sh` and the make configuration.
+The build was designed for the installed paths on this Mac. Run `scripts/doctor.sh` before rebuilding. It verifies native host architecture, dependency files, and that the MPI Fortran wrapper selects GCC 16 rather than the shell-default older compiler/MPI chain. Compiler and runtime selection is process-local in `scripts/environment.sh` and the make configuration; the Homebrew Cellar versions come from `config/toolchain-defaults.txt`, overridden per host by the ignored `private/toolchain.env`.
 
 The authoritative upstream configuration reference is VASP **6.6.1** `arch/makefile.include.gnu`. The independently authored configuration preserves its MPI, ScaLAPACK, FFTW, OpenBLAS/LAPACK and `fock_dblbuf` requirements. It uses conservative GNU optimization and the release's argument-compatibility option. Experimental CPU tuning and the template's broad warning suppression were omitted. Per-file optimization categories still follow the release build system. Warnings are retained in private logs; none was hidden by source edits.
 

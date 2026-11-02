@@ -1,19 +1,25 @@
 # Independently written configuration after inspecting the 6.6.1 GNU template.
 # MPI CPU build; no OpenMP, GPU, HDF5, qd, Libxc or external plugins.
-GNU_ROOT = /opt/homebrew/Cellar/gcc/16.2.0
-MPI_ROOT = /opt/homebrew/Cellar/open-mpi/5.0.11
-OPENBLAS_ROOT = /opt/homebrew/Cellar/openblas/0.3.34
-SCALAPACK_ROOT = /opt/homebrew/Cellar/scalapack/2.2.3
-FFTW_ROOT = /opt/homebrew/Cellar/fftw/3.3.11
+# Versions come from scripts/environment.sh (config/toolchain-defaults.txt,
+# overridden by the host-local private/toolchain.env); build via scripts/build.sh.
+ifndef PORT_GCC_VERSION
+$(error PORT_*_VERSION unset: build with scripts/build.sh, which sources scripts/environment.sh)
+endif
+GNU_ROOT = /opt/homebrew/Cellar/gcc/$(PORT_GCC_VERSION)
+MPI_ROOT = /opt/homebrew/Cellar/open-mpi/$(PORT_OPENMPI_VERSION)
+OPENBLAS_ROOT = /opt/homebrew/Cellar/openblas/$(PORT_OPENBLAS_VERSION)
+SCALAPACK_ROOT = /opt/homebrew/Cellar/scalapack/$(PORT_SCALAPACK_VERSION)
+FFTW_ROOT = /opt/homebrew/Cellar/fftw/$(PORT_FFTW_VERSION)
+GCC_MAJOR = $(firstword $(subst ., ,$(PORT_GCC_VERSION)))
 
 export OMPI_FC = $(GNU_ROOT)/bin/gfortran
-export OMPI_CC = $(GNU_ROOT)/bin/gcc-16
-export OMPI_CXX = $(GNU_ROOT)/bin/g++-16
+export OMPI_CC = $(GNU_ROOT)/bin/gcc-$(GCC_MAJOR)
+export OMPI_CXX = $(GNU_ROOT)/bin/g++-$(GCC_MAJOR)
 
 CPP_OPTIONS = -DHOST=\"DarwinARM64GNU\" -DMPI -DMPI_BLOCK=8000 \
               -Duse_collective -DscaLAPACK -DCACHE_SIZE=4000 \
               -Davoidalloc -Dvasp6 -Dtbdyn -Dfock_dblbuf
-CPP = $(GNU_ROOT)/bin/gcc-16 -E -C $*$(FUFFIX) >$*$(SUFFIX) $(CPP_OPTIONS)
+CPP = $(GNU_ROOT)/bin/gcc-$(GCC_MAJOR) -E -C $*$(FUFFIX) >$*$(SUFFIX) $(CPP_OPTIONS)
 FC = $(MPI_ROOT)/bin/mpifort
 FCL = $(FC)
 FREE = -ffree-form -ffree-line-length-none
@@ -24,12 +30,12 @@ DEBUG = -O0
 
 CPP_LIB = $(CPP)
 FC_LIB = $(FC)
-CC_LIB = $(GNU_ROOT)/bin/gcc-16
+CC_LIB = $(GNU_ROOT)/bin/gcc-$(GCC_MAJOR)
 CFLAGS_LIB = -O
 FFLAGS_LIB = -O1
 FREE_LIB = $(FREE)
 OBJECTS_LIB = linpack_double.o
-CXX_PARS = $(GNU_ROOT)/bin/g++-16
+CXX_PARS = $(GNU_ROOT)/bin/g++-$(GCC_MAJOR)
 
 LLIBS = -lstdc++ -L$(SCALAPACK_ROOT)/lib -lscalapack \
         -L$(OPENBLAS_ROOT)/lib -lopenblas -L$(FFTW_ROOT)/lib -lfftw3

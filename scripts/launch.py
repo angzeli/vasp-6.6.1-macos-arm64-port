@@ -10,9 +10,12 @@ import subprocess
 import sys
 import time
 
-MPI_VERSION = '5.0.11'
+import toolchain
+
+TOOLCHAIN, TOOLCHAIN_SOURCE = toolchain.load()
+MPI_VERSION = TOOLCHAIN['PORT_OPENMPI_VERSION']
 MPI = f'/opt/homebrew/Cellar/open-mpi/{MPI_VERSION}/bin/mpirun'
-PRTED = '/opt/homebrew/Cellar/prrte/4.1.0/bin/prted'
+PRTED = f"/opt/homebrew/Cellar/prrte/{TOOLCHAIN['PORT_PRRTE_VERSION']}/bin/prted"
 
 
 
