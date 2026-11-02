@@ -374,7 +374,8 @@ def parser():
     p.add_argument('--ranks',type=int,default=1)
     p.add_argument('--ncore',type=int)
     p.add_argument('--kpar',type=int)
-    p.add_argument('--mpi-mode',choices=('synthetic','native'),default='synthetic')
+    p.add_argument('--mpi-mode',choices=('synthetic','native'),
+                   help='default: verified host mode in private/mpi-mode.txt, else synthetic')
     p.add_argument('--restart',choices=tuple(RESTARTS),default='none')
     p.add_argument('--restart-from',type=Path)
     p.add_argument('--timeout',type=float,help='positive execution budget; required for real launch')
@@ -386,7 +387,18 @@ def parser():
     return p
 
 
+def host_mpi_mode(requested):
+    """Explicit CLI mode, then the host-verified private/mpi-mode.txt, then synthetic."""
+    if requested: return requested,'command line'
+    path=ROOT/'private/mpi-mode.txt'
+    if not path.exists(): return 'synthetic','built-in default'
+    mode=path.read_text().strip()
+    require(mode in ('synthetic','native'), f'{path} must contain native or synthetic')
+    return mode,'private/mpi-mode.txt'
+
+
 def plan(args):
+    args.mpi_mode,args.mpi_mode_source=host_mpi_mode(args.mpi_mode)
     if args.managed_foreground and not args.dry_run:
         require(os.getpgrp() != os.getpid() and os.getsid(0) == os.getpgrp()
                 and os.environ.get('CMW_JOBS_OWN_SESSION') == '1',
@@ -516,7 +528,7 @@ def describe(p):
     a=p['args']
     print(f"Input: {p['source']}\nOutput (new): {p['output']}\nBinary: {p['binary']}\nSHA-256: {p['sha']}\nRequested version: 6.6.1")
     print('MPI command:',shlex.join(p['command']))
-    print(f'MPI mode: {a.mpi_mode}; ranks={a.ranks}; timeout={a.timeout if a.timeout is not None else "NOT SET; required for execution"}; stop-before={a.stop_before}')
+    print(f'MPI mode: {a.mpi_mode} (from {a.mpi_mode_source}); ranks={a.ranks}; timeout={a.timeout if a.timeout is not None else "NOT SET; required for execution"}; stop-before={a.stop_before}')
     print('Environment:',{k:p['env'].get(k) for k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','OMPI_FC','HWLOC_SYNTHETIC')})
     print('Stage only:',', '.join(f'{n} ({s[2]} bytes)' for n,s in p['identities'].items()))
     print(f"Staging space estimate: {p['bytes']} bytes; additional runtime output space is not estimated")
@@ -595,7 +607,7 @@ def execute(p):
             note(key,p[key])
         note('variant',a.binary);note('requested_version','6.6.1')
         note('launcher_repository',provenance[0]);note('input_repository',provenance[1])
-        note('mpi',f'{launch.MPI}; {mpi_version}; mode={a.mpi_mode}; ranks={a.ranks}')
+        note('mpi',f'{launch.MPI}; {mpi_version}; mode={a.mpi_mode} (from {a.mpi_mode_source}); ranks={a.ranks}')
         note('command',shlex.join(p['command']))
         note('threads',{k:p['env'].get(k) for k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OMPI_FC','HWLOC_SYNTHETIC')})
         note('hard_budget_seconds',a.timeout);note('stop_before_seconds',a.stop_before)

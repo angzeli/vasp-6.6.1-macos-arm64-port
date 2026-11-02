@@ -12,7 +12,8 @@ construction and `supervise` owns the MPI session, deadline and cleanup. There i
 no nested timeout wrapper. `run-mpi.sh` retains its existing CLI, native default,
 600-second default and 1–8-rank range; its shared supervisor now also handles
 SIGTERM and surviving descendants. The new public runner requires its own explicit
-execution budget and defaults to synthetic MPI.
+execution budget and takes its MPI mode from `--mpi-mode`, else the host-verified
+`private/mpi-mode.txt`, else synthetic.
 
 This is local-only execution. There is no queue, remote submission, daemon, retry,
 automatic tuning, arbitrary-program option or in-place resume. A later scheduler
@@ -27,7 +28,7 @@ could invoke this CLI; no scheduler integration is implemented here.
 | `--binary std\|gam\|ncl` | `std`; resolves only the recorded binary in this port |
 | `--ranks INTEGER` | `1`; supported range 1–8 |
 | `--ncore INTEGER`, `--kpar INTEGER` | Explicit override, else unambiguous INCAR value, else 1 |
-| `--mpi-mode synthetic\|native` | `synthetic`; native is explicit diagnostics, without fallback |
+| `--mpi-mode synthetic\|native` | `private/mpi-mode.txt` if present (must be `native` or `synthetic`), else `synthetic`; no automatic fallback |
 | `--restart none\|wavecar\|chgcar\|both` | `none`; deliberate restart-file selection |
 | `--restart-from PATH` | Defaults to input for a selected restart; invalid with `none` |
 | `--timeout SECONDS` | Positive finite execution budget, required for a real launch |
@@ -140,8 +141,8 @@ reported distinctly. Unsupported optional representations are rejected.
 Hybrid Damped/All, omitted/default HFRCUT with hybrid optional points, ISYM=0 and
 KPAR>1 generate informational warnings. The launcher changes none of these
 scientific choices and does not claim ACE acceleration for Damped/All. Review
-[KPOINTS_OPT](https://vasp.at/wiki/KPOINTS_OPT) for the method contract. The tested
-host needs synthetic OpenMPI topology; native mode has not been revalidated here.
+[KPOINTS_OPT](https://vasp.at/wiki/KPOINTS_OPT) for the method contract. The M3 Max
+host needs synthetic OpenMPI topology; the M5 Pro host verified native launch.
 
 ## Deadline, checkpoint and completion semantics
 

@@ -128,8 +128,8 @@ independent new execution directory, and run an existing validated binary:
 ```
 
 The output parent must exist and the output itself must be new. Add `--dry-run`
-for a plan without files or MPI/VASP execution. Defaults are synthetic MPI, one
-rank, and no restart; NCORE/KPAR use explicit CLI values, then unambiguous INCAR
+for a plan without files or MPI/VASP execution. The MPI mode defaults to the host's
+`private/mpi-mode.txt` (else synthetic), with one rank and no restart; NCORE/KPAR use explicit CLI values, then unambiguous INCAR
 values, then 1. A real run requires an explicit timeout.
 
 Read the [launcher guide](docs/LAUNCHER.md) for restart staging, supported input

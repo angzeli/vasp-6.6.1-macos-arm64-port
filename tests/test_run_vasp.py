@@ -43,6 +43,16 @@ class RunnerTests(unittest.TestCase):
         if incar is not None:(self.source/'INCAR').write_text(incar)
         return runner.plan(self.args(*extra))
 
+    def test_mpi_mode_precedence(self):
+        host=self.root/'host';(host/'private').mkdir(parents=True)
+        with patch.object(runner,'ROOT',host):
+            self.assertEqual(runner.host_mpi_mode(None),('synthetic','built-in default'))
+            (host/'private/mpi-mode.txt').write_text('native\n')
+            self.assertEqual(runner.host_mpi_mode(None),('native','private/mpi-mode.txt'))
+            self.assertEqual(runner.host_mpi_mode('synthetic'),('synthetic','command line'))
+            (host/'private/mpi-mode.txt').write_text('auto\n')
+            with self.assertRaises(runner.PreflightError):runner.host_mpi_mode(None)
+
     def test_parallel_parser_preserves_science(self):
         original='encut=300; NcOrE = 2 ! keep comment\nKPAR=1; HFSCREEN=.2 # text\nMAGMOM = 0 \\\n 0\nNPAR=8\n'
         p=self.make(original,'--ranks','8','--ncore','4')
