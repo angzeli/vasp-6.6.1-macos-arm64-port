@@ -12,7 +12,7 @@ import time
 MPI = '/opt/homebrew/Cellar/open-mpi/5.0.9/bin/mpirun'
 
 
-def mpi_command(program, ranks, mode):
+def mpi_command(program, ranks, mode, *, managed_foreground=False):
     if not 1 <= ranks <= 8 or mode not in ('native', 'synthetic'):
         raise ValueError('ranks must be 1..8; mode must be native or synthetic')
     env = os.environ.copy()
@@ -23,11 +23,13 @@ def mpi_command(program, ranks, mode):
         cores = int(subprocess.check_output(['/usr/sbin/sysctl', '-n', 'hw.physicalcpu'], text=True))
         env['HWLOC_SYNTHETIC'] = f'Package:1 Core:{cores} PU:1'
         command += ['--bind-to', 'none', '--map-by', 'slot']
+    # Preserve MPI's rank groups. Opt-in CMW ownership covers the dedicated
+    # session, not just the outer launcher group.
     return command + list(program), env
 
 
 def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
-              stop_before=0, on_stop=None, awake=False, grace=10):
+              stop_before=0, on_stop=None, awake=False, grace=10, managed_foreground=False):
     """Own one session, forward INT/TERM, enforce a deadline and reap the leader.
 
     Internal command injection supports synthetic tests, not a public CLI option.
@@ -35,6 +37,12 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
     """
     if not math.isfinite(timeout) or timeout <= 0 or not 0 <= stop_before < timeout:
         raise ValueError('timeout must be positive; 0 <= stop-before < timeout')
+    managed_group = os.getpgrp() if managed_foreground else None
+    if managed_foreground and (managed_group == os.getpid() or os.getsid(0) != managed_group):
+        raise ValueError('Managed foreground requires an inherited dedicated session/process group')
+    if managed_foreground:
+        from cmw.jobs.ownership import identity, signal_session
+        managed_owner = identity(managed_group)
     requested = []
     previous = {}
     process = inhibitor = None
@@ -60,6 +68,19 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
             pass
 
     def cleanup():
+        if managed_foreground:
+            # The outer supervisor owns descendants and final group drainage.
+            # Never wait for our own group to disappear while we belong to it.
+            if process.poll() is None:
+                # CMW already sent TERM to every member. A second TERM can
+                # trigger MPI's emergency abort rather than orderly drainage.
+                if not requested:
+                    process.terminate()
+                try:
+                    process.wait(timeout=grace)
+                except subprocess.TimeoutExpired:
+                    signal_session(managed_owner, signal.SIGKILL)
+            return
         if not group_exists():
             process.wait()
             return
@@ -81,7 +102,7 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
         started = time.monotonic()
         start_utc = datetime.now(timezone.utc).isoformat()
         process = subprocess.Popen(command, cwd=cwd, env=env, stdout=stdout,
-                                   stderr=stderr, start_new_session=True)
+                                   stderr=stderr, start_new_session=not managed_foreground)
         if awake:
             inhibitor = subprocess.Popen(['/usr/bin/caffeinate', '-i', '-w', str(os.getpid())],
                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -96,12 +117,17 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
                 break
             elapsed = time.monotonic() - started
             if elapsed >= timeout:
+                if managed_foreground:
+                    # The explicit hard deadline must cover MPI descendants too.
+                    # This intentionally ends the payload/launcher together; no
+                    # completed-result metadata or copy-back is claimed.
+                    signal_session(managed_owner, signal.SIGKILL)
                 reason, status = 'timeout', 124
                 break
             if stop_before and stop_note == 'not reached' and elapsed >= timeout - stop_before:
                 stop_note = str(on_stop()) if on_stop else 'no stop callback'
             time.sleep(min(0.1, timeout - elapsed))
-        if reason != 'completed' or group_exists():
+        if reason != 'completed' or (not managed_foreground and group_exists()):
             cleanup()
     except BaseException:
         if process is not None:

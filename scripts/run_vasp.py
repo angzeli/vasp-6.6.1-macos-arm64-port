@@ -236,23 +236,99 @@ def binary_identity(variant):
     return binary,sha
 
 
+def same_charge_structure(handle, target):
+    """Allow only CHGCAR geometry rounding implied by its printed tokens.
+
+    POSCAR/WAVECAR comparisons remain strict. No atom remapping or header edits.
+    Coarser than six-decimal output and negative-volume scales get no allowance.
+    """
+    start = handle.tell()
+    actual = structure(handle)
+    end = handle.tell()
+    try:
+        same_structure(actual, target)
+        return
+    except PreflightError:
+        pass
+    handle.seek(start)
+    lines = []
+    while handle.tell() < end:
+        lines.append(handle.readline().split())
+    require(actual['species'] == target['species'] and actual['counts'] == target['counts'],
+            'Restart species/order/counts differ')
+    scale = number(lines[1][0])
+    require(scale > 0, 'Rounded CHGCAR matching requires a positive scale')
+
+    def allowance(token):
+        from decimal import Decimal
+        normalized = token.replace('D', 'E').replace('d', 'e')
+        if '.' not in normalized and 'e' not in normalized.lower():
+            return 0.0
+        exponent = Decimal(normalized).as_tuple().exponent
+        require(exponent <= -6, 'CHGCAR geometry precision too coarse for rounding-aware reuse')
+        return float(Decimal(5).scaleb(exponent - 1))
+
+    for i, row in enumerate(actual['cell']):
+        for j, value in enumerate(row):
+            bound = abs(scale) * allowance(lines[2+i][j])
+            require(abs(value-target['cell'][i][j]) <= bound+1e-12,
+                    'Restart cell differs beyond CHGCAR printed rounding')
+    offset = 7
+    if lines[offset][0].lower().startswith('s'):
+        offset += 1
+    direct = lines[offset][0].lower().startswith('d')
+    for index, (source, expected) in enumerate(zip(actual['positions'], target['positions'])):
+        tokens = lines[offset+1+index][:3]
+        image = [round(x-y) for x,y in zip(source,expected)]
+        for j in range(3):
+            if direct:
+                difference = (source[j]-expected[j])-image[j]
+                bound = allowance(tokens[j])
+            else:
+                reference = sum((expected[k]+image[k])*target['cell'][k][j] for k in range(3))
+                difference = number(tokens[j])*scale-reference
+                bound = abs(scale)*allowance(tokens[j])
+            require(abs(difference) <= bound+1e-12,
+                    'Restart sites differ beyond CHGCAR printed rounding')
+
+
 def charge_header(path, target, electrons, spin):
     """Stream density and augmentation blocks once; no full-file in-memory copy."""
     with path.open() as f:
-        same_structure(structure(f),target)
+        same_charge_structure(f,target)
         blocks=0; grid=None; total=0.; augmentations=0
+        natoms=sum(target['counts']); moments_seen=False
         for line in f:
             if not line.strip(): continue
-            aug=re.fullmatch(r'\s*augmentation occupancies\s+\d+\s+(\d+)\s*',line)
+            aug=re.fullmatch(r'\s*augmentation occupancies\s+(\d+)\s+(\d+)\s*',line)
             if aug:
-                remaining=int(aug.group(1));augmentations+=1
+                require(0 < blocks <= spin and augmentations < blocks*natoms
+                        and int(aug.group(1)) == augmentations % natoms + 1,
+                        'Missing, duplicated or out-of-order CHGCAR augmentation')
+                remaining=int(aug.group(2));augmentations+=1
                 while remaining:
                     row=f.readline().split();require(row, 'Truncated CHGCAR augmentation')
                     for token in row: number(token)
                     remaining-=len(row);require(remaining>=0, 'Malformed CHGCAR augmentation count')
                 continue
             fields=line.split()
-            require(len(fields)==3 and all(re.fullmatch(r'\d+',v) for v in fields), 'Unsupported/truncated CHGCAR block')
+            is_grid=len(fields)==3 and all(re.fullmatch(r'\d+',v) for v in fields)
+            if not is_grid:
+                # VASP 6.6.1 writes NIONS atomic moments before the spin grid.
+                # Accept this optional record only at the complete charge boundary.
+                require(spin==2 and blocks==1 and augmentations==natoms and not moments_seen,
+                        'Unsupported/truncated CHGCAR block')
+                remaining=natoms
+                while remaining:
+                    require(fields and len(fields)<=remaining, 'Malformed CHGCAR atomic-moment count')
+                    for token in fields: number(token)
+                    remaining-=len(fields)
+                    if remaining:
+                        fields=f.readline().split()
+                moments_seen=True
+                continue
+            require(blocks < spin and augmentations==blocks*natoms,
+                    'Unexpected CHGCAR grid or missing augmentation blocks')
             current=[int(x) for x in fields]
             require(all(x>0 for x in current) and (grid is None or grid==current), 'Inconsistent CHGCAR grid')
             grid=current;remaining=math.prod(grid);blocksum=0.
@@ -262,7 +338,7 @@ def charge_header(path, target, electrons, spin):
                 require(remaining>=0, 'Malformed CHGCAR density count')
             if blocks==0: total=blocksum/math.prod(grid)
             blocks+=1
-        require(blocks==spin and augmentations>=sum(target['counts'])*blocks, 'Missing CHGCAR spin/augmentation blocks')
+        require(blocks==spin and augmentations==natoms*blocks, 'Missing CHGCAR spin/augmentation blocks')
         require(abs(total-electrons)<=1e-3, f'CHGCAR electron integral {total:.6f} differs from target {electrons:.6f}')
     return f'cell/sites, {blocks} density blocks, augmentation counts and electron integral checked; PAW completeness beyond stored channels not certified'
 
@@ -305,10 +381,16 @@ def parser():
     p.add_argument('--stop-before',type=float,default=0,help='request STOPCAR this many seconds before hard timeout')
     p.add_argument('--extra-input',action='append',default=[],metavar='BASENAME')
     p.add_argument('--dry-run',action='store_true')
+    p.add_argument('--managed-foreground',action='store_true',
+                   help='inherit a dedicated supervisor group; hard timeout kills that entire job group')
     return p
 
 
 def plan(args):
+    if args.managed_foreground and not args.dry_run:
+        require(os.getpgrp() != os.getpid() and os.getsid(0) == os.getpgrp()
+                and os.environ.get('CMW_JOBS_OWN_SESSION') == '1',
+                'Managed foreground requires an inherited dedicated CMW session')
     require(1<=args.ranks<=8, 'Supported rank range is 1..8')
     require(args.timeout is not None or args.dry_run, 'A real launch requires explicit --timeout SECONDS')
     require(args.timeout is None or math.isfinite(args.timeout) and args.timeout>0, '--timeout must be positive and finite')
@@ -411,7 +493,8 @@ def plan(args):
     sizes=snapshots
     needed=sum(s[2] for s in sizes.values())+len(effective.encode())+65536
     require(shutil.disk_usage(output.parent).free>=needed, 'Insufficient free space to stage selected files (runtime output needs additional space)')
-    command,env=launch.mpi_command([str(binary)],args.ranks,args.mpi_mode)
+    command,env=launch.mpi_command([str(binary)],args.ranks,args.mpi_mode,
+                                 **({'managed_foreground': True} if args.managed_foreground else {}))
     return dict(args=args,source=source,output=output,donor=donor,files=files,identities=sizes,
                 incar=incar,effective=effective,changes=changes,parallel=parallel,origins=origins,
                 binary=binary,sha=sha,binary_stat=identity(binary),command=command,env=env,bytes=needed,warnings=warnings,
@@ -516,6 +599,7 @@ def execute(p):
         note('command',shlex.join(p['command']))
         note('threads',{k:p['env'].get(k) for k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OMPI_FC','HWLOC_SYNTHETIC')})
         note('hard_budget_seconds',a.timeout);note('stop_before_seconds',a.stop_before)
+        note('managed_foreground',a.managed_foreground)
         note('restart_requested',a.restart);note('restart_preflight',p['restart_checks'])
         note('warnings',p['warnings']);note('incar_overrides',p['changes'])
         for name,path in p['files'].items():
@@ -544,7 +628,8 @@ def execute(p):
         note('state','RUNNING')
         with (out/'stdout.log').open('x') as stdout, (out/'stderr.log').open('x') as stderr:
             result=launch.supervise(p['command'],a.timeout,cwd=out,env=p['env'],stdout=stdout,stderr=stderr,
-                                    stop_before=a.stop_before,on_stop=stop,awake=True)
+                                    stop_before=a.stop_before,on_stop=stop,awake=True,
+                                    managed_foreground=a.managed_foreground)
         for key,value in result.items(): note(key,value)
         evidence,version_ok,rejected=output_evidence(p)
         for key,value in evidence.items(): note(key,value)

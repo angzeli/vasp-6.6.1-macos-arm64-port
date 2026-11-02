@@ -95,6 +95,11 @@ and [ICHARG](https://vasp.at/wiki/ICHARG) semantics.
 
 CHGCAR checks stream the structure, density/spin and augmentation blocks, reject
 obvious truncation, and compare the electron integral (1e-3 electrons tolerance).
+Collinear files may include the VASP 6.6.1 atomic-moment record between the
+complete charge augmentation block and the spin grid. Exactly one finite value
+per atom is required when present; it is not a third density block. Files without
+this optional record remain supported. Augmentation indices must cover each atom
+in order for each density channel; missing or duplicated blocks are rejected.
 Named species/order/counts must match, with cell/site tolerances of 1e-7; Cartesian
 positions are converted for comparison only. Changing KPOINTS alone is permitted
 for CHGCAR reuse. Stored augmentation channels are not a general PAW-completeness
