@@ -10,7 +10,7 @@ The thin shell entry point loads `scripts/environment.sh` and replaces itself wi
 existing `scripts/launch.py`: `mpi_command` owns pinned OpenMPI/synthetic topology
 construction and `supervise` owns the MPI session, deadline and cleanup. There is
 no nested timeout wrapper. `run-mpi.sh` retains its existing CLI, native default,
-600-second default and 1–8-rank range; its shared supervisor now also handles
+600-second default and 1–16-rank range; its shared supervisor now also handles
 SIGTERM and surviving descendants. The new public runner requires its own explicit
 execution budget and takes its MPI mode from `--mpi-mode`, else the host-verified
 `private/mpi-mode.txt`, else synthetic.
@@ -26,7 +26,7 @@ can invoke this CLI through the explicit managed contract below.
 | `--input PATH` | Required existing scientific-input directory |
 | `--output PATH` | Required new execution directory; parent must already exist |
 | `--binary std\|gam\|ncl` | `std`; resolves only the recorded binary in this port |
-| `--ranks INTEGER` | `1`; supported range 1–8 |
+| `--ranks INTEGER` | `1`; supported range 1–16 |
 | `--ncore INTEGER`, `--kpar INTEGER` | Explicit override, else unambiguous INCAR value, else 1 |
 | `--mpi-mode synthetic\|native` | `private/mpi-mode.txt` if present (must be `native` or `synthetic`), else `synthetic`; no automatic fallback |
 | `--restart none\|wavecar\|chgcar\|both` | `none`; deliberate restart-file selection |
@@ -44,6 +44,21 @@ Dry-run performs read-only binary identity, file/header and space checks. It may
 read substantial CHGCAR data; it is not a scientific correctness check. MPI version
 is probed immediately before real staging. Runtime banner identity is checked
 after execution, without treating the VASP executable as a version utility.
+
+## Explicit 16-rank ordinary execution
+
+The default remains one rank. Ordinary launches support at most 16 MPI ranks,
+with one OpenMP/library thread per rank and no implicit oversubscription.
+`NCORE=4, KPAR=1` is a valid 16-rank decomposition; ranks must be divisible by
+KPAR and ranks/KPAR by NCORE. This does not establish workload suitability.
+Verify the selected binary, native MPI/toolchain, available CPU/memory, input
+identities and compatible band/k-point decomposition before execution.
+
+Physical Apple M5 Pro qualification is limited to Open MPI 5.0.11 / PRRTE 4.1.0,
+16-rank harmless communication and owned cleanup, and the existing Si2 PBE
+fixture with the retained VASP 6.6.1 std binary. See [validation](VALIDATION.md).
+Controlled suspension remains limited to 1–8 ranks; ordinary 16-rank execution
+does not qualify 16-rank suspension. GPU acceleration is separate and untested.
 
 ## CMW managed foreground
 

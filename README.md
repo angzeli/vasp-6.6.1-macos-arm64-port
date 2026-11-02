@@ -158,7 +158,7 @@ construction before VASP started. The verified workaround uses a synthetic
 topology derived from the physical core count, with `--bind-to none --map-by slot`.
 It changes launch placement, not scientific source.
 
-The launcher supports **1–8 ranks**, uses one library thread per rank, preserves
+The launcher supports **1–16 ranks**, uses one library thread per rank, preserves
 exit status and terminates its own process group on timeout or interruption.
 `--mode native` selects ordinary MPI; `--mode synthetic` explicitly selects the
 workaround. There is no `auto` mode or automatic retry of a scientific calculation.

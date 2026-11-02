@@ -30,3 +30,25 @@ Only after the generic gates pass, the beta comparison uses existing production 
 After a completed optional-path case, run `python3 scripts/check-kpoints-opt.py PRIVATE_CASE_DIRECTORY`. It expands the requested reciprocal line segments, compares the ordered output coordinates modulo reciprocal-lattice translations, checks the expected number of finite band energies, and verifies that the optional driver followed the regular SCF summary. Coordinate tolerance is 1e-6 in reciprocal fractional units. This validates path topology and output structure, not k-point convergence or the accuracy of a densely sampled gap.
 
 HDF5 remains **NOT BUILT / NOT TESTED**. There is no production relaxation, EOS, pressure-enthalpy, phonon, or full Stage 05 campaign in this validation task.
+
+## Bounded M5 Pro 16-rank extension (2026-11-02)
+
+On the physical 18-core/64-GiB Apple M5 Pro Mac mini, the candidate launcher
+used Open MPI 5.0.11 and PRRTE 4.1.0 (Homebrew revision 4.1.0_1), native mode,
+and one thread per rank. A private copy of the existing MPI Allreduce fixture
+launched exactly ranks 0–15 and summed 1–16 to 136. Success, explicit exit 7,
+and timeout exit 124 left no recorded rank processes alive; an independent
+sentinel survived. Read-only std runner plans passed at 8 and 16 ranks.
+
+One bounded licensed Si2 PBE std calculation then ran at 16 ranks with NCORE=4,
+KPAR=1, the retained binary SHA-256 in `provenance/binary-sha256.txt`, and unchanged
+scientific inputs. Native evidence reported 16 MPI ranks, eight bands, eight
+electrons, 12 electronic steps, EDIFF convergence, a normal footer and exit 0.
+Energy was -8.28298469 eV, equal to the retained one-rank reference at printed
+precision (acceptance tolerance 1E-6 eV/cell). Force difference was zero at printed
+precision; maximum stress difference was 7.0E-8 kB. No owned processes remained.
+Private licensed inputs and outputs are retained only on the mini.
+
+This is a small-fixture qualification, not a universal scientific/performance
+claim. Defaults are unchanged; controlled suspension remains 1–8 ranks. No
+production runtime was deployed and GPU acceleration was not tested.

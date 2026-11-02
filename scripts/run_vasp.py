@@ -419,7 +419,10 @@ def plan(args):
         require(os.getpgrp() != os.getpid() and os.getsid(0) == os.getpgrp()
                 and os.environ.get('CMW_JOBS_OWN_SESSION') == '1',
                 'Managed foreground requires an inherited dedicated CMW session')
-    require(1<=args.ranks<=8, 'Supported rank range is 1..8')
+    require(type(args.ranks) is int and 1 <= args.ranks <= launch.MAX_MPI_RANKS,
+            f'Supported integer rank range is 1..{launch.MAX_MPI_RANKS}')
+    require(not args.controlled_suspension or args.ranks <= launch.MAX_CONTROLLED_MPI_RANKS,
+            f'Controlled suspension supports at most {launch.MAX_CONTROLLED_MPI_RANKS} ranks')
     require(args.timeout is not None or args.dry_run, 'A real launch requires explicit --timeout SECONDS')
     require(args.timeout is None or math.isfinite(args.timeout) and args.timeout>0, '--timeout must be positive and finite')
     require(math.isfinite(args.stop_before) and args.stop_before>=0 and

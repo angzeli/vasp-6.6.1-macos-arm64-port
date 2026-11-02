@@ -114,6 +114,17 @@ class ManagedForegroundTests(unittest.TestCase):
         self.assertTrue(verify_finalization(result['publication']['record_path'])['valid'])
         self.assertEqual(result['artifact_bundle']['artifact_count'],2 if getattr(self,'relaxation',False) else 1)
 
+    def test_sixteen_rank_managed_foreground_retains_binding_and_ownership(self):
+        case = self.case()
+        case['argv'][case['argv'].index('--ranks') + 1] = '16'
+        self.launch(case)
+        job = self.finish(case)
+        self.assertEqual(job['status'], 'Done', job)
+        self.assertIn('ranks=16', (case['run'] / 'RUN_METADATA.txt').read_text())
+        result = finalize_result(case['run'], policy_path=case['policy_path'],
+                                 spec_path=case['spec_path'], scratch_root=case['scratch'], record_directory='accepted')
+        self.assertTrue(verify_finalization(result['publication']['record_path'])['valid'])
+
     def test_nonzero_and_scientific_failure_refuse_finalization(self):
         case=self.case(exit_code=7 if not getattr(self,'relaxation',False) else 0,converged=not getattr(self,'relaxation',False))
         self.launch(case);job=self.finish(case)

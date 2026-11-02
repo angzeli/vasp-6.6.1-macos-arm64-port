@@ -74,7 +74,7 @@ def entry(arguments):
 
     def command(program,ranks,mode,**kwargs):
         assert program == [sys.executable] and kwargs.get('managed_foreground') is True
-        assert 1 <= ranks <= 8 and mode == 'native'
+        assert 1 <= ranks <= launch.MAX_MPI_RANKS and mode == 'native'
         return [sys.executable,str(script),'payload',str(root)],dict(os.environ)
 
     def supervise(command,timeout,**kwargs):

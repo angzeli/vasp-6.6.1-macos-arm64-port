@@ -32,4 +32,4 @@ The launch interface is:
 /absolute/path/to/port/scripts/run-mpi.sh --ranks 8 --mode synthetic --timeout 600 -- /absolute/path/to/port/macos-arm64/bin/vasp_std
 ```
 
-Run it from a calculation directory. It supports 1–8 ranks, returns the program/launcher status, and terminates its own launch process group on timeout or interruption. Synthetic mode derives the physical core count and disables binding; it is a reliability workaround, not a placement optimization. Native mode remains selectable for future revalidation. The launcher never retries an already-started VASP calculation automatically.
+Run it from a calculation directory. It supports 1–16 ranks, returns the program/launcher status, and terminates its own launch process group on timeout or interruption. Synthetic mode derives the physical core count and disables binding; it is a reliability workaround, not a placement optimization. Native mode remains selectable for future revalidation. The launcher never retries an already-started VASP calculation automatically.

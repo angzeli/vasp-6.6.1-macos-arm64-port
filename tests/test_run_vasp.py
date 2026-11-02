@@ -74,10 +74,39 @@ class RunnerTests(unittest.TestCase):
     def test_defaults_and_divisibility(self):
         self.assertEqual(self.make()['parallel'],{'NCORE':1,'KPAR':1})
         self.assertEqual(self.make(None,'--ranks','8','--ncore','2','--kpar','2')['parallel'],{'NCORE':2,'KPAR':2})
-        for extra in [('--ranks','9'),('--ranks','0'),('--ncore','0'),('--ranks','8','--kpar','3'),('--ranks','8','--kpar','2','--ncore','3')]:
+        for extra in [('--ranks','17'),('--ranks','0'),('--ncore','0'),('--ranks','8','--kpar','3'),('--ranks','8','--kpar','2','--ncore','3')]:
             with self.subTest(extra=extra),self.assertRaises(runner.PreflightError):self.make(None,*extra)
         for tag in ['IMAGES=2','NOMEGAPAR=2','NCORE_IN_IMAGE1=4','LCLIMB=T']:
             with self.subTest(tag=tag),self.assertRaises(runner.PreflightError):self.make(tag)
+
+    def test_explicit_rank_boundaries_and_suspension_scope(self):
+        for ranks in (1, 2, 4, 8, 16):
+            with self.subTest(ranks=ranks):
+                self.make(None, '--ranks', str(ranks), '--mpi-mode', 'native')
+                command, env = launch.mpi_command(['/usr/bin/true'], ranks, 'native')
+                self.assertEqual(command[1:3], ['-np', str(ranks)])
+                self.assertNotIn('--oversubscribe', command)
+                self.assertEqual(env['OMP_NUM_THREADS'], '1')
+                self.assertEqual(env['OPENBLAS_NUM_THREADS'], '1')
+        for ranks in (0, -1, 17, True, 1.5, '16'):
+            with self.subTest(ranks=ranks), self.assertRaises(ValueError):
+                launch.mpi_command(['/usr/bin/true'], ranks, 'native')
+        for value in ('0', '-1', '17'):
+            with self.subTest(value=value), self.assertRaises(runner.PreflightError):
+                self.make(None, '--ranks', value)
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.args('--ranks', 'malformed')
+        self.assertEqual(self.make(None, '--ranks', '16', '--ncore', '4', '--kpar', '1')['parallel'],
+                         {'NCORE': 4, 'KPAR': 1})
+        for options in (('--ncore', '3'), ('--kpar', '3'), ('--ncore', '16', '--kpar', '2')):
+            with self.subTest(options=options), self.assertRaises(runner.PreflightError):
+                self.make(None, '--ranks', '16', *options)
+        with self.assertRaisesRegex(ValueError, 'suspension'):
+            launch.mpi_command(['/usr/bin/true'], 16, 'native', managed_foreground=True, controlled_suspension=True)
+        with self.assertRaisesRegex(ValueError, 'suspension'):
+            self.make(None, '--ranks', '16', '--controlled-suspension', '--managed-foreground',
+                      '--execution-budget', '5', '--stop-before', '0', '--dry-run')
+        self.assertEqual(self.args().ranks, 1)
 
     def test_paths_and_exclusive_destination(self):
         for destination in [self.source,self.source/'nested',ROOT/'scripts/new-run',Path('/Applications/Academic/new-run')]:

@@ -19,14 +19,20 @@ PRTED = f"/opt/homebrew/Cellar/prrte/{TOOLCHAIN['PORT_PRRTE_VERSION']}/bin/prted
 
 
 
+MAX_MPI_RANKS = 16
+MAX_CONTROLLED_MPI_RANKS = 8
+
+
 def mpi_command(program, ranks, mode, *, managed_foreground=False, controlled_suspension=False):
-    if not 1 <= ranks <= 8 or mode not in ('native', 'synthetic'):
-        raise ValueError('ranks must be 1..8; mode must be native or synthetic')
+    if type(ranks) is not int or not 1 <= ranks <= MAX_MPI_RANKS or mode not in ('native', 'synthetic'):
+        raise ValueError(f'ranks must be integers in 1..{MAX_MPI_RANKS}; mode must be native or synthetic')
     env = os.environ.copy()
     env.pop('HWLOC_SYNTHETIC', None)
     env.update(OMP_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1')
     command = [MPI, '-np', str(ranks)]
     if controlled_suspension:
+        if ranks > MAX_CONTROLLED_MPI_RANKS:
+            raise ValueError(f'Controlled suspension supports at most {MAX_CONTROLLED_MPI_RANKS} ranks')
         if not managed_foreground:
             raise ValueError('Controlled suspension requires managed foreground ownership')
         inherited = sorted(key for key in env if key.startswith(('OMPI_MCA_', 'PRTE_MCA_', 'PMIX_MCA_',
