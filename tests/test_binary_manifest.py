@@ -74,7 +74,7 @@ class ManifestTests(unittest.TestCase):
         data = {'schema': 'vasp-port.binary-manifest.v1', 'name': name, 'status': 'reviewed',
                 'executable': {'path': str(self.exe), 'sha256': sha(self.exe), 'bytes': self.exe.stat().st_size},
                 'vasp': {'version': '6.6.1', 'variant': 'std'},
-                'backend': {'name': 'vasp-metal-backend', 'version': '0.3.0', 'source_commit': 'c' * 40,
+                'backend': {'name': 'vasp-metal-backend', 'version': '1.2.3', 'source_commit': 'c' * 40,
                             'source_digest': 'd' * 64, 'source_dirty': True, 'library_sha256': 'e' * 64,
                             'report_schema': 'vmb.rank-report.v1',
                             'aggregator': {'path': str(self.aggregator), 'sha256': sha(self.aggregator)}},
@@ -119,7 +119,7 @@ class ManifestTests(unittest.TestCase):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             runner.describe(p)
-        self.assertIn('EXPERIMENTAL backend 0.3.0', out.getvalue())
+        self.assertIn('EXPERIMENTAL backend 1.2.3', out.getvalue())
 
     def test_cmw_attempt_identity(self):
         self.manifest()

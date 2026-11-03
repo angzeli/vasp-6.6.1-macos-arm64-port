@@ -250,7 +250,7 @@ def reject_constant(token):
 def manifest_identity(name, variant):
     """Pinned experimental executable from a reviewed private manifest.
 
-    Contract: vasp-metal-backend docs/CONTRACT-v0.3.md, section C. Only
+    Contract: docs/LAUNCHER.md, 'Experimental pinned binary'. Only
     PORT_ROOT/private/binary-manifests/NAME.json is read; there is no path or
     environment override. Every recorded digest is re-checked here and again
     immediately before launch.
@@ -324,7 +324,7 @@ def backend_attempt(managed_launch=False):
     if value is not None:
         require(re.fullmatch(r'[0-9a-f]{32}',value) is not None, 'Malformed CMW_JOBS_ATTEMPT_ID')
         return value,'cmw'
-    require(not managed_launch, 'Managed binary-manifest launches require CMW_JOBS_ATTEMPT_ID from a v0.3-capable CMW worker')
+    require(not managed_launch, 'Managed binary-manifest launches require CMW_JOBS_ATTEMPT_ID from a CMW worker that exports it')
     return 'run-'+os.urandom(16).hex(),'runner'
 
 
