@@ -60,6 +60,56 @@ fixture with the retained VASP 6.6.1 std binary. See [validation](VALIDATION.md)
 Controlled suspension remains limited to 1–8 ranks; ordinary 16-rank execution
 does not qualify 16-rank suspension. GPU acceleration is separate and untested.
 
+## Experimental pinned binary (`--binary-manifest`)
+
+The ordinary `--binary std|gam|ncl` route is unchanged. One experimental std
+executable, such as a vasp-metal-backend relink, may be selected only
+explicitly:
+
+```sh
+scripts/run-vasp.sh --input IN --output NEW --binary std --binary-manifest NAME \
+    --ranks 16 --ncore 4 --kpar 1 --mpi-mode native --restart none \
+    --timeout SECONDS --stop-before 0 --managed-foreground
+```
+
+**Where the manifest lives.** `NAME` is a plain name. The runner reads only
+`private/binary-manifests/NAME.json`, a reviewed `vasp-port.binary-manifest.v1`
+written by the backend's `scripts/make-binary-manifest.py`. The file must be a
+private regular file, at most 64 KiB, and not a symbolic link. There is no
+command-line executable path and no environment override.
+
+**What the runner checks.** The run is refused before staging unless:
+- the executable is the exact recorded regular arm64 Mach-O file, matching its
+  SHA-256 and size;
+- the variant equals `--binary`, and the version is 6.6.1;
+- the toolchain equals this runner's effective toolchain (tracked defaults plus
+  the host-local `private/toolchain.env`);
+- every pinned runtime library still resolves to the same file with the same
+  digest;
+- the pinned aggregator is unchanged.
+
+The digests are checked again immediately before launch. Controlled suspension
+is refused on this route.
+
+**Payload environment.** The manifest alone sets the backend mode and shadow
+check. The runner removes inherited `VMB_*` variables, then sets:
+- `VMB_REPORT_DIR=OUTPUT/vmb-reports` (a new 0700 directory);
+- `VMB_ATTEMPT_ID`: the CMW attempt from `CMW_JOBS_ATTEMPT_ID`, or a fresh run
+  ID outside CMW;
+- `VMB_EXPECT_WORLD_SIZE=--ranks`;
+- `VMB_TELEMETRY=rank`.
+
+**After the payload.** The pinned aggregator writes `OUTPUT/vmb-evidence.json`.
+`RUN_METADATA.txt` records the selection in its staging block (`binary_selection`,
+`binary_manifest`, `backend`, `backend_mode`, `backend_check`,
+`backend_attempt_id`, `backend_report_dir`). It records the evidence in its
+terminal block (`backend_evidence`, `backend_evidence_status`,
+`backend_summary`).
+
+**Exit status.** The launcher status still comes from VASP. Incomplete or
+invalid backend evidence is recorded, never hidden. Ordinary runs write exactly
+the older metadata keys.
+
 ## CMW managed foreground
 
 The opt-in route requires `CMW_JOBS_OWN_SESSION=1` on the Jobs submission and a
