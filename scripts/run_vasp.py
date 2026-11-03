@@ -311,7 +311,7 @@ def manifest_identity(name, variant):
     require(build.get('object_count') and isinstance(build.get('objects'),str), 'Manifest build provenance is incomplete')
     return dict(name=name,path=path,manifest_sha=hashlib.sha256(raw).hexdigest(),manifest_stat=identity(path),
                 binary=binary,sha=sha,mode=mode,check=check,backend=backend,aggregator=pinned[0][0],
-                pinned=pinned)
+                pinned=pinned,resolutions=[(dep['path'],dep['resolved']) for dep in deps])
 
 
 def backend_attempt(managed_launch=False):
@@ -834,7 +834,10 @@ def execute(p):
             return message
         require(identity(p['binary'])==p['binary_stat'], 'Selected binary changed after identity verification')
         if s is not None:
-            require(identity(s['path'])==s['manifest_stat'] and digest(p['binary'])==p['sha']
+            # Narrows, but cannot eliminate, the window between these checks and exec.
+            require(identity(s['path'])==s['manifest_stat'] and digest(s['path'])==s['manifest_sha']
+                    and all(os.path.realpath(link)==resolved for link,resolved in s['resolutions'])
+                    and digest(p['binary'])==p['sha']
                     and all(digest(path)==expected for path,expected,_ in s['pinned']),
                     'Binary manifest, executable or pinned dependency changed before launch')
         note('state','RUNNING')

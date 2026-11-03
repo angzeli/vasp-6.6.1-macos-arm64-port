@@ -88,8 +88,10 @@ command-line executable path and no environment override.
   digest;
 - the pinned aggregator is unchanged.
 
-The digests are checked again immediately before launch. Controlled suspension
-is refused on this route.
+Immediately before launch the runner re-digests the manifest bytes, re-resolves
+every pinned library link and re-hashes the executable, aggregator and
+libraries. This narrows, but cannot eliminate, the window before exec.
+Controlled suspension is refused on this route.
 
 **Payload environment.** The manifest alone sets the backend mode and shadow
 check. The runner removes inherited `VMB_*` variables, then sets:

@@ -231,5 +231,45 @@ class ManifestTests(unittest.TestCase):
         self.assertIn('changed before launch', (self.output / 'RUN_METADATA.txt').read_text())
 
 
+    def launch_after(self, change):
+        """Plan, apply a change between preflight and launch, and attempt execution."""
+        self.manifest()
+        p = self.plan()
+        change()
+        launched = []
+
+        def fake_supervise(command, timeout, **kwargs):
+            launched.append(command)
+            return dict(status=0, child_status=0, reason='completed', advance_stop='disabled',
+                        start_utc=datetime.now(timezone.utc).isoformat())
+        with patch.object(launch, 'supervise', side_effect=fake_supervise), \
+                patch.object(runner, 'git_identity', return_value='synthetic test'), \
+                contextlib.redirect_stdout(io.StringIO()):
+            status = runner.execute(p)
+        return status, launched, (self.output / 'RUN_METADATA.txt').read_text()
+
+    def test_prelaunch_detects_manifest_rewrite_with_preserved_stat(self):
+        path = self.host / 'private/binary-manifests/gpu-force.json'
+
+        def rewrite():
+            info = path.stat()
+            text = path.read_text()
+            path.write_text(text.replace('"shadow_check": true', '"shadow_check": 1   '))
+            os.utime(path, ns=(info.st_atime_ns, info.st_mtime_ns))
+            self.assertEqual((path.stat().st_size, path.stat().st_mtime_ns), (info.st_size, info.st_mtime_ns))
+        status, launched, metadata = self.launch_after(rewrite)
+        self.assertEqual((status, launched), (1, []))
+        self.assertIn('changed before launch', metadata)
+
+    def test_prelaunch_detects_dependency_retarget(self):
+        def retarget():
+            twin = self.root / 'Cellar/libdemo-twin.dylib'
+            twin.write_bytes(self.cellar.read_bytes())  # identical bytes, different file
+            self.opt.unlink()
+            self.opt.symlink_to(twin)
+        status, launched, metadata = self.launch_after(retarget)
+        self.assertEqual((status, launched), (1, []))
+        self.assertIn('changed before launch', metadata)
+
 if __name__ == '__main__':
     unittest.main()
