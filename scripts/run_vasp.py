@@ -28,7 +28,13 @@ RESTARTS = {'none': (), 'wavecar': ('WAVECAR',), 'chgcar': ('CHGCAR',), 'both': 
 RESERVED = set(REQUIRED) | {'KPOINTS_OPT', 'WAVECAR', 'CHGCAR', 'TMPCAR', 'TAUCAR',
     'OUTCAR', 'OSZICAR', 'CONTCAR', 'STOPCAR', 'IBZKPT', 'EIGENVAL', 'DOSCAR', 'PROCAR',
     'CHG', 'XDATCAR', 'PCDAT', 'LOCPOT', 'REPORT', 'VASPRUN.XML', 'VASPOUT.H5',
-    'RUN_METADATA.TXT', 'STDOUT.LOG', 'STDERR.LOG'}
+    'RUN_METADATA.TXT', 'STDOUT.LOG', 'STDERR.LOG', 'VMB-REPORTS', 'VMB-EVIDENCE.JSON'}
+MANIFEST_SCHEMA = 'vasp-port.binary-manifest.v1'
+MANIFEST_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
+TOOLCHAIN_KEYS = ('PORT_GCC_VERSION', 'PORT_OPENMPI_VERSION', 'PORT_PRRTE_VERSION',
+                  'PORT_OPENBLAS_VERSION', 'PORT_SCALAPACK_VERSION', 'PORT_FFTW_VERSION')
+BACKEND_MODES = ('off', 'auto', 'force')
+SHA256 = re.compile(r'[0-9a-f]{64}')
 
 
 class PreflightError(ValueError):
@@ -237,6 +243,91 @@ def binary_identity(variant):
     return binary,sha
 
 
+def reject_constant(token):
+    raise ValueError(f'non-finite constant {token}')
+
+
+def manifest_identity(name, variant):
+    """Pinned experimental executable from a reviewed private manifest.
+
+    Contract: docs/LAUNCHER.md, 'Experimental pinned binary'. Only
+    PORT_ROOT/private/binary-manifests/NAME.json is read; there is no path or
+    environment override. Every recorded digest is re-checked here and again
+    immediately before launch.
+    """
+    require(platform.system()=='Darwin' and platform.machine()=='arm64', 'run-vasp requires native Darwin/arm64')
+    require(MANIFEST_NAME.fullmatch(name) is not None, '--binary-manifest must be a plain name of [A-Za-z0-9._-]')
+    path=ROOT/'private/binary-manifests'/(name+'.json')
+    require(os.path.lexists(path), f'Binary manifest {name!r} is not installed under private/binary-manifests')
+    info=path.lstat()
+    require(stat.S_ISREG(info.st_mode) and info.st_uid==os.getuid() and not info.st_mode & 0o022
+            and 0 < info.st_size <= 65536, 'Binary manifest must be a private regular file of at most 64 KiB')
+    raw=path.read_bytes()
+    try:
+        manifest=json.loads(raw.decode(), parse_constant=reject_constant)
+    except ValueError as error:
+        raise PreflightError(f'Malformed binary manifest: {error}') from None
+    def field(obj,key,kind):
+        require(isinstance(obj,dict) and isinstance(obj.get(key),kind), f'Binary manifest lacks {key}')
+        return obj[key]
+    require(field(manifest,'schema',str)==MANIFEST_SCHEMA and field(manifest,'name',str)==name
+            and field(manifest,'status',str)=='reviewed', 'Binary manifest is not a reviewed vasp-port.binary-manifest.v1 for this name')
+    vasp=field(manifest,'vasp',dict)
+    require(field(vasp,'version',str)=='6.6.1', 'Binary manifest is not VASP 6.6.1')
+    require(field(vasp,'variant',str)==variant, f'Binary manifest variant differs from --binary {variant}')
+    exe=field(manifest,'executable',dict)
+    binary=Path(field(exe,'path',str))
+    require(binary.is_absolute() and str(binary)==os.path.realpath(binary), 'Manifest executable must be a canonical absolute path')
+    binary=regular(binary)
+    require(os.access(binary,os.X_OK), 'Manifest executable is not executable')
+    description=subprocess.check_output(['/usr/bin/file','-b',str(binary)],text=True)
+    require('Mach-O' in description and 'arm64' in description, 'Manifest executable lacks an arm64 Mach-O slice')
+    sha=digest(binary)
+    require(SHA256.fullmatch(field(exe,'sha256',str)) and sha==exe['sha256'] and binary.stat().st_size==field(exe,'bytes',int),
+            'Manifest executable SHA-256 or size differs from the reviewed build')
+    toolchain=field(manifest,'toolchain',dict)
+    require({k:toolchain.get(k) for k in TOOLCHAIN_KEYS}==launch.TOOLCHAIN and set(toolchain)==set(TOOLCHAIN_KEYS),
+            'Manifest toolchain differs from this runner\'s effective toolchain')
+    backend=field(manifest,'backend',dict)
+    require(field(backend,'name',str)=='vasp-metal-backend' and field(backend,'report_schema',str)=='vmb.rank-report.v1',
+            'Manifest backend or report schema is unsupported')
+    for key in ('version','source_commit','source_digest','library_sha256'): field(backend,key,str)
+    field(backend,'source_dirty',bool)
+    aggregator=field(backend,'aggregator',dict)
+    pinned=[(Path(field(aggregator,'path',str)),field(aggregator,'sha256',str),'aggregator')]
+    deps=field(manifest,'runtime_dependencies',list)
+    for dep in deps:
+        require(isinstance(dep,dict) and set(dep)=={'path','resolved','sha256'}
+                and all(isinstance(dep[k],str) for k in dep), 'Malformed manifest runtime dependency')
+        require(os.path.realpath(dep['path'])==dep['resolved'], f"Runtime dependency {dep['path']} now resolves elsewhere")
+        pinned.append((Path(dep['resolved']),dep['sha256'],dep['path']))
+    for dep_path,expected,label in pinned:
+        require(dep_path.is_absolute() and SHA256.fullmatch(expected) is not None and digest(regular(dep_path))==expected,
+                f'Pinned {label} differs from the binary manifest')
+    selection=field(manifest,'selection',dict)
+    mode,check=field(selection,'mode',str),field(selection,'shadow_check',bool)
+    require(mode in BACKEND_MODES, 'Manifest backend mode must be off, auto or force')
+    build=field(manifest,'build',dict)
+    require(build.get('object_count') and isinstance(build.get('objects'),str), 'Manifest build provenance is incomplete')
+    return dict(name=name,path=path,manifest_sha=hashlib.sha256(raw).hexdigest(),manifest_stat=identity(path),
+                binary=binary,sha=sha,mode=mode,check=check,backend=backend,aggregator=pinned[0][0],
+                pinned=pinned,resolutions=[(dep['path'],dep['resolved']) for dep in deps])
+
+
+def backend_attempt(managed_launch=False):
+    """CMW attempt ID when running as a managed CMW payload, else a fresh run ID.
+
+    A managed launch must be bound to its Jobs attempt: an older CMW worker that
+    does not export the attempt cannot produce attributable backend evidence.
+    """
+    value=os.environ.get('CMW_JOBS_ATTEMPT_ID')
+    if value is not None:
+        require(re.fullmatch(r'[0-9a-f]{32}',value) is not None, 'Malformed CMW_JOBS_ATTEMPT_ID')
+        return value,'cmw'
+    require(not managed_launch, 'Managed binary-manifest launches require CMW_JOBS_ATTEMPT_ID from a CMW worker that exports it')
+    return 'run-'+os.urandom(16).hex(),'runner'
+
+
 def same_charge_structure(handle, target):
     """Allow only CHGCAR geometry rounding implied by its printed tokens.
 
@@ -373,6 +464,8 @@ def parser():
     p.add_argument('--input',required=True,type=Path)
     p.add_argument('--output',required=True,type=Path)
     p.add_argument('--binary',choices=('std','gam','ncl'),default='std')
+    p.add_argument('--binary-manifest',
+                   help='experimental: reviewed private manifest NAME pinning a relinked executable and backend settings')
     p.add_argument('--ranks',type=int,default=1)
     p.add_argument('--ncore',type=int)
     p.add_argument('--kpar',type=int)
@@ -519,7 +612,13 @@ def plan(args):
         require(name not in files, 'Duplicate --extra-input name')
         files[name]=regular(source/name)
         snapshots[name]=identity(files[name])
-    binary,sha=binary_identity(args.binary)
+    selection=None
+    if args.binary_manifest is not None:
+        require(not args.controlled_suspension, 'The binary-manifest route is not qualified for controlled suspension')
+        selection=manifest_identity(args.binary_manifest,args.binary)
+        binary,sha=selection['binary'],selection['sha']
+    else:
+        binary,sha=binary_identity(args.binary)
     require(all(identity(path)==snapshots[name] for name,path in files.items()), 'An input changed during preflight; retry with immutable inputs')
     sizes=snapshots
     needed=sum(s[2] for s in sizes.values())+len(effective.encode())+65536
@@ -527,7 +626,15 @@ def plan(args):
     command,env=launch.mpi_command([str(binary)],args.ranks,args.mpi_mode,
                                  **({'managed_foreground': True} if args.managed_foreground else {}),
                                  **({'controlled_suspension': True} if args.controlled_suspension else {}))
-    return dict(args=args,source=source,output=output,donor=donor,files=files,identities=sizes,
+    if selection is not None:
+        # Backend settings come from the reviewed manifest only.
+        for key in [k for k in env if k.startswith('VMB_')]: env.pop(key)
+        attempt,origin=backend_attempt(args.managed_foreground and not args.dry_run)
+        env.update(VMB_MODE=selection['mode'],VMB_CHECK='1' if selection['check'] else '0',
+                   VMB_EXPECT_WORLD_SIZE=str(args.ranks),VMB_TELEMETRY='rank',
+                   VMB_REPORT_DIR=str(output/'vmb-reports'),VMB_ATTEMPT_ID=attempt)
+        selection.update(attempt=attempt,attempt_origin=origin)
+    return dict(args=args,source=source,output=output,donor=donor,files=files,identities=sizes,selection=selection,
                 incar=incar,effective=effective,changes=changes,parallel=parallel,origins=origins,
                 binary=binary,sha=sha,binary_stat=identity(binary),command=command,env=env,bytes=needed,warnings=warnings,
                 restart_checks=checks,active_opt=active,istart=istart,icharg=icharg,electrons=electrons)
@@ -552,6 +659,12 @@ def describe(p):
     if a.controlled_suspension:
         print(f'Controlled suspension: pause-aware execution budget={a.execution_budget}s; hard budget={a.timeout}s; no power assertion; native engine and sleep unqualified')
     print('Environment:',{k:p['env'].get(k) for k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','OMPI_FC','HWLOC_SYNTHETIC')})
+    s=p['selection']
+    if s is not None:
+        print(f"Binary manifest: {s['path']} (SHA-256 {s['manifest_sha']}); EXPERIMENTAL backend "
+              f"{s['backend']['version']} source={s['backend']['source_commit']} digest={s['backend']['source_digest']}")
+        print(f"Backend: VMB_MODE={s['mode']} VMB_CHECK={int(s['check'])} reports={p['output']/'vmb-reports'} "
+              f"attempt={s['attempt']} ({s['attempt_origin']})")
     print('Stage only:',', '.join(f'{n} ({s[2]} bytes)' for n,s in p['identities'].items()))
     print(f"Staging space estimate: {p['bytes']} bytes; additional runtime output space is not estimated")
     print(f"Restart: {a.restart}; donor={p['donor']}; ISTART={p['istart']}; ICHARG={p['icharg']}; KPOINTS_OPT active={p['active_opt']}")
@@ -606,6 +719,30 @@ def output_evidence(p):
     return data,versions=={'6.6.1'},rejected
 
 
+def backend_evidence(p,result):
+    """Run the manifest-pinned aggregator once; record, never hide, its verdict."""
+    s,out=p['selection'],p['output']
+    target=out/'vmb-evidence.json'
+    try:
+        require(digest(s['aggregator'])==s['pinned'][0][1], 'Pinned aggregator changed during the run')
+        start=datetime.fromisoformat(result['start_utc']).timestamp()
+        run=subprocess.run([sys.executable,'-I','-B',str(s['aggregator']),'aggregate','--dir',str(out/'vmb-reports'),
+                            '--attempt-id',s['attempt'],'--world-size',str(p['args'].ranks),'--mode',s['mode'],
+                            '--check','1' if s['check'] else '0','--executable',str(p['binary']),
+                            '--not-before',str(start-5),'--output',str(target)],
+                           stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True,timeout=120)
+        data=json.loads(target.read_text())
+        require(data.get('schema')=='vmb.attempt-evidence.v1' and data.get('attempt_id')==s['attempt'],
+                'Aggregator wrote unexpected evidence')
+        summary=run.stderr.strip().splitlines()[-1]
+        json.loads(summary)
+        return {'backend_evidence':f'{target}; sha256={digest(target)}','backend_evidence_status':data['evidence'],
+                'backend_summary':summary}
+    except (PreflightError,OSError,ValueError,KeyError,IndexError,subprocess.SubprocessError) as error:
+        return {'backend_evidence':f'{target}; sha256=NONE','backend_evidence_status':'AGGREGATION_FAILED',
+                'backend_summary':json.dumps({'error':str(error)[:500]})}
+
+
 def execute(p):
     out=p['output'];a=p['args'];meta=None;previous={};baseline={}
     # MPI version is a read-only utility probe, never invoked by --dry-run.
@@ -653,6 +790,17 @@ def execute(p):
         note('threads',{k:p['env'].get(k) for k in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','VECLIB_MAXIMUM_THREADS','OMPI_FC','HWLOC_SYNTHETIC')})
         note('hard_budget_seconds',a.timeout);note('stop_before_seconds',a.stop_before)
         note('managed_foreground',a.managed_foreground)
+        s=p['selection']
+        if s is not None:
+            note('binary_selection','manifest')
+            note('binary_manifest',f"{s['path']}; sha256={s['manifest_sha']}; name={s['name']}")
+            b=s['backend']
+            note('backend',f"vasp-metal-backend {b['version']}; source_commit={b['source_commit']}; "
+                           f"source_digest={b['source_digest']}; library_sha256={b['library_sha256']}")
+            note('backend_mode',s['mode']);note('backend_check',s['check'])
+            note('backend_attempt_id',f"{s['attempt']}; origin={s['attempt_origin']}")
+            (out/'vmb-reports').mkdir(mode=0o700)
+            note('backend_report_dir',out/'vmb-reports')
         if control is not None:
             note('runner_metadata_version',2)
             note('controlled_suspension_protocol','cmw-suspension-v1')
@@ -685,6 +833,13 @@ def execute(p):
             note('advance_stop_request',message)
             return message
         require(identity(p['binary'])==p['binary_stat'], 'Selected binary changed after identity verification')
+        if s is not None:
+            # Narrows, but cannot eliminate, the window between these checks and exec.
+            require(identity(s['path'])==s['manifest_stat'] and digest(s['path'])==s['manifest_sha']
+                    and all(os.path.realpath(link)==resolved for link,resolved in s['resolutions'])
+                    and digest(p['binary'])==p['sha']
+                    and all(digest(path)==expected for path,expected,_ in s['pinned']),
+                    'Binary manifest, executable or pinned dependency changed before launch')
         note('state','RUNNING')
         with (out/'stdout.log').open('x') as stdout, (out/'stderr.log').open('x') as stderr:
             result=launch.supervise(p['command'],a.timeout,cwd=out,env=p['env'],stdout=stdout,stderr=stderr,
@@ -695,6 +850,8 @@ def execute(p):
             note(key,json.dumps(value,sort_keys=True,separators=(',', ':')) if key == 'suspension_intervals' else value)
         evidence,version_ok,rejected=output_evidence(p)
         for key,value in evidence.items(): note(key,value)
+        if s is not None:
+            for key,value in backend_evidence(p,result).items(): note(key,value)
         status=result['status']
         if status==0 and (not version_ok or rejected):
             status=65;note('validation_failure','Version unverified/mismatched or requested WAVECAR rejected; inspect retained outputs')
