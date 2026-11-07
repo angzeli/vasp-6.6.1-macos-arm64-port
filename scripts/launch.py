@@ -21,6 +21,8 @@ PRTED = f"/opt/homebrew/Cellar/prrte/{TOOLCHAIN['PORT_PRRTE_VERSION']}/bin/prted
 
 MAX_MPI_RANKS = 16
 MAX_CONTROLLED_MPI_RANKS = 8
+# Match CMW's worker policy: attention after a minute, without releasing ownership.
+OWNERSHIP_ATTENTION_AFTER = 60.0
 
 
 def mpi_command(program, ranks, mode, *, managed_foreground=False, controlled_suspension=False):
@@ -68,13 +70,27 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
                                or os.environ.get("CMW_JOBS_OWN_SESSION") != "1"):
         raise ValueError('Managed foreground requires an inherited dedicated session/process group')
     if managed_foreground:
-        from cmw.jobs.ownership import identity, owner_alive, group_members, signal_session
-        if "include_leader" not in inspect.signature(signal_session).parameters:
-            raise ValueError('Managed mode requires CMW protected-leader subgroup cleanup support')
-        managed_owner = identity(managed_group)
-        members = set(group_members(managed_group, session=True))
-        if not owner_alive(managed_owner) or members != {managed_group, os.getpid()}:
-            raise ValueError(f'Managed mode requires the sole foreground payload in a dedicated CMW session (leader={managed_group}, payload={os.getpid()}, members={sorted(members)})')
+        try:
+            from cmw.jobs.ownership import (identity, observe_owner, OwnershipStatus,
+                                            OwnershipUnavailable, group_members, signal_session)
+            import psutil
+            if not callable(observe_owner) or not callable(signal_session):
+                raise ImportError('Incomplete CMW ownership API')
+            if not all(hasattr(OwnershipStatus, name) for name in ('VERIFIED', 'GONE', 'UNVERIFIABLE')):
+                raise ImportError('Incomplete CMW tri-state ownership API')
+        except ImportError as exc:
+            raise ValueError('Managed mode requires CMW v2 tri-state ownership and read-domain hold support; upgrade CMW') from exc
+        # anchor_ready_for_release identifies the additive denied-send hold API;
+        # read_domain alone also existed before that behavior was implemented.
+        required = {'include_leader', 'read_domain', 'anchor_ready_for_release'}
+        if not required <= set(inspect.signature(signal_session).parameters):
+            raise ValueError('Managed mode requires CMW tri-state ownership and denied-send hold support; upgrade CMW')
+        try:
+            managed_owner = identity(managed_group)
+        except (OSError, psutil.Error) as exc:
+            raise ValueError('Managed startup identity UNVERIFIABLE; no child launched') from exc
+        if managed_owner.get('version') != 2:
+            raise ValueError('Managed mode requires CMW v2 kernel identity; upgrade CMW')
     requested = []
     previous = {}
     process = inhibitor = None
@@ -99,9 +115,60 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
         except ProcessLookupError:
             pass
 
-    def managed_members():
-        if not owner_alive(managed_owner) or os.getsid(0) != managed_group or os.getpgrp() != managed_group:
+    def verify_managed_authority():
+        observed = observe_owner(managed_owner)
+        if observed.status == OwnershipStatus.UNVERIFIABLE:
+            raise OwnershipUnavailable(observed.deciding_check, 'Managed ownership is UNVERIFIABLE')
+        if observed.status == OwnershipStatus.GONE:
+            raise RuntimeError(f'Managed ownership GONE ({observed.deciding_check}); descendants unresolved; no signal authorized')
+        if observed.status != OwnershipStatus.VERIFIED:
+            raise RuntimeError('Unsupported CMW ownership result; no signal authorized')
+        if (os.getsid(0) != managed_group or os.getpgrp() != managed_group or
+                os.getsid(managed_group) != managed_group or os.getpgid(managed_group) != managed_group):
             raise RuntimeError('Managed session authority changed; no local signal authorized')
+
+    def read_domain(observation, *, first_failure=None):
+        # The runner owns no Jobs queue or guardian pipe. Retain its existing
+        # foreground lifetime and retry only reads, as WorkerAuthority does.
+        delay, held_check = .25, None
+        held_since = attention_at = None
+        recovery_read = False
+        while True:
+            try:
+                verify_managed_authority()
+                if first_failure is not None:
+                    error, first_failure = first_failure, None
+                    raise error
+                value = observation()
+                verify_managed_authority()
+            except (OwnershipUnavailable, OSError, psutil.AccessDenied) as exc:
+                check = exc.deciding_check if isinstance(exc, OwnershipUnavailable) else 'domain.read'
+                now = time.monotonic()
+                if held_since is None:
+                    held_since, attention_at = now, now + OWNERSHIP_ATTENTION_AFTER
+                if held_check != check:
+                    print(f'Managed ownership UNVERIFIABLE ({check}); retaining supervision and pending operation',
+                          file=sys.stderr, flush=True)
+                held_check = check
+                if now >= attention_at:
+                    print(f'Managed ownership UNVERIFIABLE for {now - held_since:.1f}s ({check}); '
+                          'operator attention required; retaining supervision without signalling',
+                          file=sys.stderr, flush=True)
+                    attention_at = now + OWNERSHIP_ATTENTION_AFTER
+                recovery_read = False
+                if process is not None:
+                    process.poll()
+                time.sleep(delay)
+                delay = min(delay * 2, 5.)
+            else:
+                if held_since is not None:
+                    if not recovery_read:
+                        recovery_read = True
+                        continue  # A fresh reread must succeed before clearing the hold.
+                    print('Managed ownership VERIFIED; resuming pending observation', file=sys.stderr, flush=True)
+                return value
+
+    def observe_managed_members():
         protected = {managed_group, os.getpid()}
         if inhibitor is not None:
             protected.add(inhibitor.pid)
@@ -114,18 +181,43 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
                 pass
         return members
 
+    def managed_members():
+        return read_domain(observe_managed_members)
+
+    def request_control_termination(reason, status):
+        while True:
+            try:
+                control.request_termination(reason, exit_code=status)
+                return
+            except OwnershipUnavailable as exc:
+                # CMW raises this typed failure before publishing the request.
+                # Retry the authority read, then the same unpublished intent.
+                # Generic I/O errors may follow publication: never replay those.
+                read_domain(lambda: control._check_authority(check_storage=False), first_failure=exc)
+
+    if managed_foreground:
+        # Refuse before spawning if the initial exclusive topology is unreadable.
+        try:
+            verify_managed_authority()
+            members = set(group_members(managed_group, session=True))
+            verify_managed_authority()
+        except (OwnershipUnavailable, OSError, psutil.AccessDenied) as exc:
+            raise ValueError('Managed startup ownership UNVERIFIABLE; no child launched') from exc
+        if members != {managed_group, os.getpid()}:
+            raise ValueError('Managed mode requires the sole foreground payload in a dedicated CMW session')
+
     def cleanup():
         if managed_foreground:
             # Exclusive foreground topology is checked before launch. CMW retains
             # its leader group; shared birth checks authorize only child groups.
             if managed_members():
-                signal_session(managed_owner, signal.SIGTERM, include_leader=False)
+                signal_session(managed_owner, signal.SIGTERM, include_leader=False, read_domain=read_domain)
             end = time.monotonic() + grace
             while managed_members() and time.monotonic() < end:
                 process.poll()
                 time.sleep(.05)
             if managed_members():
-                signal_session(managed_owner, signal.SIGKILL, include_leader=False)
+                signal_session(managed_owner, signal.SIGKILL, include_leader=False, read_domain=read_domain)
             process.wait(timeout=grace)
             end = time.monotonic() + grace
             while managed_members() and time.monotonic() < end:
@@ -172,10 +264,19 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
                 status = 128 + requested[0]
                 if control is None:
                     break
-                control.request_termination(reason, exit_code=status)
+                request_control_termination(reason, status)
                 terminating = True
-            if child is not None and (control.domain_drained() if control is not None else
-                                      not managed_foreground or not managed_members()):
+            drained = child is not None and (control.domain_drained() if control is not None else
+                                            not managed_foreground or not managed_members())
+            if managed_foreground and control is None:
+                # A cancellation/deadline may have arrived during an ownership
+                # hold. Re-evaluate intent before publishing drained completion.
+                if requested:
+                    continue
+                if time.monotonic() - started >= timeout:
+                    reason, status = 'timeout', 124
+                    break
+            if drained:
                 if status is None:
                     status = child if child >= 0 else 128 - child
                 break
@@ -183,7 +284,7 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
             if control is not None:
                 if not terminating and (elapsed >= timeout or control.execution_budget_exhausted(execution_budget)):
                     reason, status = ('timeout' if elapsed >= timeout else 'execution-budget'), 124
-                    control.request_termination(reason, exit_code=status)
+                    request_control_termination(reason, status)
                     terminating = True
                 # The worker alone controls computation and termination. A stopped
                 # child remains live; runner accounting and hard deadlines continue.
@@ -199,11 +300,10 @@ def supervise(command, timeout, *, cwd=None, env=None, stdout=None, stderr=None,
             cleanup_entered = True
             cleanup()
     except BaseException:
-        if process is not None and not cleanup_entered:
-            if control is None:
-                cleanup()
-            else:
-                control.request_termination('runner-error', exit_code=1)
+        # An observation or runner error is not managed termination intent,
+        # including in coordinated mode. Never replace a pending request.
+        if process is not None and not cleanup_entered and not managed_foreground:
+            cleanup()
         raise
     finally:
         if inhibitor is not None:

@@ -1,0 +1,59 @@
+name: Runner ownership
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.11'
+          - os: macos-15
+            python: '3.14'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: port
+      - name: Read the CMW qualification candidate
+        id: cmw
+        shell: bash
+        run: |
+          revision=$(cat port/config/cmw-test-revision.txt)
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: angzeli/computational-modelling-workflow
+          ref: ${{ steps.cmw.outputs.revision }}
+          path: cmw-reference
+      - uses: actions/checkout@v4
+        with:
+          repository: angzeli/computational-modelling-workflow
+          # Frozen negative reference, not the movable qualification candidate.
+          ref: 31616be474b2e2fd04ab6257c990983d46ddfcde
+          path: cmw-legacy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install psutil==7.2.2
+      - name: Synthetic ownership and coordinated drainage
+        working-directory: port
+        env:
+          CMW_JOBS_STATE: ${{ runner.temp }}/runner-ownership-sandbox/state
+          CMW_LEGACY_REFERENCE: ${{ github.workspace }}/cmw-legacy
+          PYTHONPATH: ${{ github.workspace }}/cmw-reference/src:${{ github.workspace }}/port/scripts:${{ github.workspace }}/port/tests
+        run: |
+          python -c 'import os, unittest; os.setpriority(os.PRIO_PROCESS, 0, 19); priority = os.getpriority(os.PRIO_PROCESS, 0); print("Test priority:", priority, flush=True); assert priority == 19; unittest.main(module=None)' -v test_ownership_hold test_controlled_drainage test_controlled_suspend test_cmw_api_compatibility test_persistent_hold

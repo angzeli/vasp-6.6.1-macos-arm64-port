@@ -1,11 +1,13 @@
 """Controlled port finalization delegates to the shared strict runner gate."""
 import importlib.util
+import errno
 import os
 from pathlib import Path
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from cmw.jobs import ownership
+from ownership_fixture import Family, load_runner
 
 SPEC = importlib.util.spec_from_file_location('controlled_drainage_launch', Path(__file__).resolve().parents[1] / 'scripts/launch.py')
 launch = importlib.util.module_from_spec(SPEC)
@@ -23,8 +25,10 @@ class ControlledDrainageTests(unittest.TestCase):
              patch.object(launch.os, 'getpid', return_value=20), \
              patch.object(launch.os, 'getpgrp', return_value=10), \
              patch.object(launch.os, 'getsid', return_value=10), \
-             patch.object(ownership, 'identity', return_value={'pid': 10}), \
-             patch.object(ownership, 'owner_alive', return_value=True), \
+             patch.object(launch.os, 'getpgid', return_value=10), \
+             patch.object(ownership, 'identity', return_value={'version': 2, 'pid': 10}), \
+             patch.object(ownership, 'observe_owner', return_value=Mock(
+                 status=ownership.OwnershipStatus.VERIFIED, deciding_check='identity')), \
              patch.object(ownership, 'group_members', return_value=[10, 20]), \
              patch.object(launch.subprocess, 'Popen', return_value=child) as popen, \
              patch.object(launch.signal, 'signal'), \
@@ -38,6 +42,64 @@ class ControlledDrainageTests(unittest.TestCase):
         control.request_termination.assert_not_called()
         popen.assert_called_once()
         send.assert_not_called()
+
+    def test_unreadable_control_request_retries_only_the_original_intent(self):
+        runner = load_runner()
+        for intent, reason, status in (('cancel', 'SIGTERM', 143), ('timeout', 'timeout', 124)):
+            with self.subTest(intent=intent):
+                family = Family(intent=intent)
+                control = Mock(elapsed=1, intervals=[], suspended_seconds=0, unsuspended_elapsed=1)
+                control.execution_budget_exhausted.return_value = False
+                control.domain_drained.return_value = True
+                publications = []
+
+                def request(requested_reason, *, exit_code):
+                    if control.request_termination.call_count == 1:
+                        raise ownership.OwnershipUnavailable('control.authority', 'synthetic unreadable authority')
+                    publications.append((requested_reason, exit_code))
+                    family.live = False
+
+                control.request_termination.side_effect = request
+                self.assertEqual(family.run(runner, control=control), (reason, status),
+                                 family.diagnostics.getvalue())
+                self.assertEqual(control.request_termination.call_args_list,
+                                 [call(reason, exit_code=status), call(reason, exit_code=status)])
+                self.assertEqual(publications, [(reason, status)])
+                control._check_authority.assert_called_with(check_storage=False)
+                self.assertEqual(family.requests, [])
+
+    def test_uncertain_control_publication_is_not_replayed_or_changed_to_runner_error(self):
+        runner = load_runner()
+        for intent, reason, status in (('cancel', 'SIGTERM', 143), ('timeout', 'timeout', 124)):
+            with self.subTest(intent=intent):
+                family = Family(intent=intent)
+                control = Mock(elapsed=1, intervals=[], suspended_seconds=0, unsuspended_elapsed=1)
+                control.execution_budget_exhausted.return_value = False
+                publications = []
+
+                def request(requested_reason, *, exit_code):
+                    publications.append((requested_reason, exit_code))
+                    raise OSError(errno.EIO, 'synthetic failure after control publication')
+
+                control.request_termination.side_effect = request
+                with self.assertRaisesRegex(OSError, 'after control publication'):
+                    family.run(runner, control=control)
+                control.request_termination.assert_called_once_with(reason, exit_code=status)
+                self.assertEqual(publications, [(reason, status)])
+                self.assertEqual(family.requests, [])
+
+    def test_unreadable_ordinary_control_drainage_does_not_invent_termination(self):
+        runner = load_runner()
+        family = Family()
+        control = Mock(elapsed=1, intervals=[], suspended_seconds=0, unsuspended_elapsed=1)
+        control.execution_budget_exhausted.return_value = False
+        control.domain_drained.side_effect = ownership.OwnershipUnavailable(
+            'control.drainage', 'synthetic unreadable drainage')
+        reason, status = family.run(runner, control=control)
+        self.assertIsNone(status)
+        self.assertIn('unreadable drainage', reason)
+        control.request_termination.assert_not_called()
+        self.assertEqual(family.requests, [])
 
 
 if __name__ == '__main__':
