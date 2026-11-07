@@ -115,15 +115,25 @@ the older metadata keys.
 ## CMW managed foreground
 
 The opt-in route requires `CMW_JOBS_OWN_SESSION=1` on the Jobs submission and
-CMW's version-2 kernel identity, `observe_owner` tri-state API, and shared
-`signal_session` support for `include_leader=False` and `read_domain`.
-An older CMW installation is refused before MPI starts; there is no Boolean
-ownership fallback. The synthetic compatibility tests pin CMW
-`7ef4ef7366f7853aa940fdc8bd5f902f1a8676cb` (including its denied-send hold).
-Other CMW revisions require separate qualification even if they pass the API
-checks. Coordinated termination also relies on this revision's pre-publication
-`OwnershipUnavailable` contract and authority-read callback; uncertain published
-requests are never replayed or replaced with a different termination reason.
+CMW's version-2 kernel identity, callable `observe_owner`, all three
+`OwnershipStatus` values, `OwnershipUnavailable`, and shared `signal_session`
+support for `include_leader`, `read_domain` and `anchor_ready_for_release`.
+The last parameter identifies the additive denied-send hold API: `read_domain`
+alone existed before that behavior. Incompatible CMW is refused before MPI
+starts; there is no Boolean fallback or runtime commit/version allowlist.
+Newer CMW with these capabilities is accepted.
+
+The single movable CI candidate is
+[`config/cmw-test-revision.txt`](../config/cmw-test-revision.txt). Change its full
+commit SHA and rerun the synthetic CI matrix to qualify a deployment candidate;
+the runner never reads this file. CI also checks refusal of the frozen historical
+`31616be` ownership module, whose separate reference is a negative fixture.
+Signatures detect the API contract, not arbitrary implementation correctness:
+tests execute the candidate's real helpers to verify denied/uncertain-send holds,
+confirmed absence and no signal replay. Coordinated termination also relies on
+the pre-publication `OwnershipUnavailable` contract and authority-read callback;
+uncertain published requests are never replayed or replaced with a different
+termination reason. Passing startup checks alone is not deployment qualification.
 `CMW_MANAGED_PYTHON` may select the interpreter that provides that CMW installation;
 the shell forwards every argument without adding a second wrapper. The port has
 no `--threads` option: the shell's existing three thread limits remain one.
@@ -141,8 +151,24 @@ are unsupported. This restricted sole-payload contract grants no general authori
 over arbitrary siblings or external processes.
 
 `UNVERIFIABLE` retains supervision and the pending operation, with observation
-retries backing off from 0.25 to at most 5 seconds. Recovery resumes the original
-observation: ordinary drainage does not become termination. A cancellation or
+retries backing off from 0.25 to at most 5 seconds. The runner flushes an immediate
+diagnostic to stderr. After 60 seconds of continuous uncertainty it reports
+**operator attention required**, repeating every 60 seconds while still held.
+These monotonic notices occur on the next retry, normally within five seconds
+of the threshold unless a system read itself blocks. Changing the deciding check
+or failing the fresh recovery reread does not reset the timer. This mirrors CMW's
+60-second worker escalation while retaining supervision; runner diagnostics do
+not themselves change the CMW queue's status to `Unknown`.
+
+The hold is **indefinite**, not a bounded status-75 exit. It never declares
+completion, releases ownership or authorizes a signal merely because time passes.
+After MPI exits it keeps observing descendant drainage; during ordinary drainage
+it preserves that observation; during timeout cleanup it preserves the timeout
+and cleanup phase. A denied or uncertain send remains an absence-observation hold
+without replay. Every signal still requires fresh verified authority.
+
+Recovery resumes the original observation after a fresh complete reread: ordinary
+drainage does not become termination. A cancellation or
 execution deadline that arrives during a hold is reconsidered before completion.
 Confirmed `GONE` refuses further control and reports unresolved descendants.
 An observation failure or unrelated runner exception is not a termination request.

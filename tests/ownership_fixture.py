@@ -35,7 +35,7 @@ class Family:
     def __init__(self, *, intent='exit', wall_step=0, denied_reads=0, reused=False,
                  fault_at=None, denied_send=None, resistant=False, persistent=False,
                  extra_group=False, cancel_during_hold=False, timeout=None, uncertain_send=False,
-                 drain_after=3, fault_kind='permission', topology_changed=False):
+                 drain_after=3, fault_kind='permission', topology_changed=False, hold_limit=12):
         self.intent = intent
         self.wall_step = wall_step
         self.denied_reads = denied_reads
@@ -51,6 +51,7 @@ class Family:
         self.drain_after = drain_after
         self.fault_kind = fault_kind
         self.topology_changed = topology_changed
+        self.hold_limit = hold_limit
         self.now = 0.
         self.polls = 0
         self.probes = 0
@@ -164,9 +165,9 @@ class Family:
                 self.extra_live = False
             else:
                 self.live = False
-        if self.persistent and self.now >= 12:
+        if self.persistent and self.now >= self.hold_limit:
             raise HoldObserved()
-        if self.now > 40:
+        if self.now > max(40, self.hold_limit + 10):
             raise AssertionError('synthetic supervisor exceeded observation budget')
 
     def killpg(self, pgid, signum):
