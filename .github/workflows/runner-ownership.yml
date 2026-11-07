@@ -23,7 +23,6 @@ jobs:
     timeout-minutes: 5
     env:
       PYTHONDONTWRITEBYTECODE: '1'
-      CMW_JOBS_STATE: ${{ runner.temp }}/runner-ownership-sandbox/state
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,6 +39,7 @@ jobs:
       - name: Synthetic ownership and coordinated drainage
         working-directory: port
         env:
+          CMW_JOBS_STATE: ${{ runner.temp }}/runner-ownership-sandbox/state
           PYTHONPATH: ${{ github.workspace }}/cmw-reference/src:${{ github.workspace }}/port/scripts:${{ github.workspace }}/port/tests
         run: |
           nice -n 19 python -c 'import os, unittest; assert os.getpriority(os.PRIO_PROCESS, 0) == 19; unittest.main(module=None)' -v test_ownership_hold test_controlled_drainage
