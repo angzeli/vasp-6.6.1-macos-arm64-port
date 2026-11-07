@@ -114,8 +114,16 @@ the older metadata keys.
 
 ## CMW managed foreground
 
-The opt-in route requires `CMW_JOBS_OWN_SESSION=1` on the Jobs submission and a
-CMW version whose shared `signal_session` supports `include_leader=False`.
+The opt-in route requires `CMW_JOBS_OWN_SESSION=1` on the Jobs submission and
+CMW's version-2 kernel identity, `observe_owner` tri-state API, and shared
+`signal_session` support for `include_leader=False` and `read_domain`.
+An older CMW installation is refused before MPI starts; there is no Boolean
+ownership fallback. The synthetic compatibility tests pin CMW
+`7ef4ef7366f7853aa940fdc8bd5f902f1a8676cb` (including its denied-send hold).
+Other CMW revisions require separate qualification even if they pass the API
+checks. Coordinated termination also relies on this revision's pre-publication
+`OwnershipUnavailable` contract and authority-read callback; uncertain published
+requests are never replayed or replaced with a different termination reason.
 `CMW_MANAGED_PYTHON` may select the interpreter that provides that CMW installation;
 the shell forwards every argument without adding a second wrapper. The port has
 no `--threads` option: the shell's existing three thread limits remain one.
@@ -131,6 +139,25 @@ never successful completion. CMW retains outer cancellation authority; neither
 its controller nor supervisor is a local port signal target. New-session escapes
 are unsupported. This restricted sole-payload contract grants no general authority
 over arbitrary siblings or external processes.
+
+`UNVERIFIABLE` retains supervision and the pending operation, with observation
+retries backing off from 0.25 to at most 5 seconds. Recovery resumes the original
+observation: ordinary drainage does not become termination. A cancellation or
+execution deadline that arrives during a hold is reconsidered before completion.
+Confirmed `GONE` refuses further control and reports unresolved descendants.
+An observation failure or unrelated runner exception is not a termination request.
+
+During genuine cleanup, CMW handles a refused or uncertain send by holding for
+confirmed subgroup absence. The runner does not replay the signal, including
+when an earlier subgroup was already signalled. Persistent uncertainty can extend
+supervision beyond the execution deadline and cleanup grace; neither budget
+grants authority to signal an unverifiable process. Coordinated mode continues
+to leave termination to the CMW worker.
+
+These are synthetic process-lifetime checks, not deployment or real VASP
+qualification. Cutover still requires updating CMW's pinned runner fixture,
+turning its four expected failures into normal assertions, recording the new
+D31 canonical commit and qualification, and a separate real-engine smoke run.
 
 Use explicit input/output, ranks, NCORE/KPAR, restart and budget arguments. Source
 inputs remain unchanged; metadata records the original input, new output, managed

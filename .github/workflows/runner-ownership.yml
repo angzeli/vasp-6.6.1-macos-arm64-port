@@ -1,0 +1,45 @@
+name: Runner ownership
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python: '3.11'
+          - os: macos-15
+            python: '3.14'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      CMW_JOBS_STATE: ${{ runner.temp }}/runner-ownership-sandbox/state
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: port
+      - uses: actions/checkout@v4
+        with:
+          repository: angzeli/computational-modelling-workflow
+          ref: 7ef4ef7366f7853aa940fdc8bd5f902f1a8676cb
+          path: cmw-reference
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install psutil==7.2.2
+      - name: Synthetic ownership and coordinated drainage
+        working-directory: port
+        env:
+          PYTHONPATH: ${{ github.workspace }}/cmw-reference/src:${{ github.workspace }}/port/scripts:${{ github.workspace }}/port/tests
+        run: |
+          nice -n 19 python -c 'import os, unittest; assert os.getpriority(os.PRIO_PROCESS, 0) == 19; unittest.main(module=None)' -v test_ownership_hold test_controlled_drainage
