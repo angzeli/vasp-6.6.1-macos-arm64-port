@@ -228,7 +228,10 @@ python3 -B scripts/check-repository.py
 The checker validates the tracked/index file boundary and representative ignore
 rules. It does not replace manual review for proprietary content or secrets,
 or an audit of reachable history before publication. Do not force-add private
-files. No GitHub Actions workflow is currently included in this repository.
+files. The [Runner ownership workflow](.github/workflows/runner-ownership.yml)
+runs synthetic ownership tests on Ubuntu/Python 3.11 and macOS ARM64/Python 3.14.
+It does not run this repository-boundary checker; run the checker locally before
+committing.
 
 ## Repository map
 
@@ -247,6 +250,7 @@ files. No GitHub Actions workflow is currently included in this repository.
 ## Documentation
 
 - [Local calculation launcher](docs/LAUNCHER.md)
+- [Output visibility and deferred buffering qualification](docs/OUTPUT-VISIBILITY.md)
 - [Launcher validation](validation/reports/LAUNCHER_VALIDATION.md)
 - [Build workflow and MPI launcher](docs/BUILD.md)
 - [Validation definitions and tolerances](docs/VALIDATION.md)
