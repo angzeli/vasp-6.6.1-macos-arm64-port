@@ -42,4 +42,4 @@ jobs:
           CMW_JOBS_STATE: ${{ runner.temp }}/runner-ownership-sandbox/state
           PYTHONPATH: ${{ github.workspace }}/cmw-reference/src:${{ github.workspace }}/port/scripts:${{ github.workspace }}/port/tests
         run: |
-          nice -n 19 python -c 'import os, unittest; priority = os.getpriority(os.PRIO_PROCESS, 0); print("Test priority:", priority, flush=True); assert priority >= 19; unittest.main(module=None)' -v test_ownership_hold test_controlled_drainage test_controlled_suspend
+          python -c 'import os, unittest; os.setpriority(os.PRIO_PROCESS, 0, 19); priority = os.getpriority(os.PRIO_PROCESS, 0); print("Test priority:", priority, flush=True); assert priority == 19; unittest.main(module=None)' -v test_ownership_hold test_controlled_drainage test_controlled_suspend
