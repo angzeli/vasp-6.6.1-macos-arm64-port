@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import launch
@@ -75,19 +75,17 @@ class CoordinatedSupervisorTests(unittest.TestCase):
         control = Control()
         with patch.dict(os.environ, {'CMW_JOBS_OWN_SESSION': '1'}), \
              patch.object(os, 'getpid', return_value=20), patch.object(os, 'getpgrp', return_value=10), \
-             patch.object(os, 'getsid', return_value=10), patch.object(os, 'getpgid', return_value=30), \
-             patch.object(ownership, 'identity', return_value={'pid': 10}), \
-             patch.object(ownership, 'owner_alive', return_value=True), \
+             patch.object(os, 'getsid', return_value=10), \
+             patch.object(os, 'getpgid', side_effect=lambda pid: 10 if pid in (0, 10, 20) else 30), \
+             patch.object(ownership, 'identity', return_value={'version': 2, 'pid': 10}), \
+             patch.object(ownership, 'observe_owner', return_value=Mock(
+                 status=ownership.OwnershipStatus.VERIFIED, deciding_check='identity')), \
              patch.object(ownership, 'group_members', side_effect=lambda *a, **k: [10, 20] if process.returncode is not None or control.ticks == 0 else [10, 20, 30]), \
              patch.object(launch.subprocess, 'Popen', return_value=process), \
              patch.object(launch.time, 'sleep'), patch.object(os, 'killpg') as killpg, \
-             patch.object(ownership, 'signal_session') as signal_session:
-            # Keep the required protected-leader signature available to the legacy guard.
-            import inspect
-            with patch.object(launch.inspect, 'signature', return_value=inspect.Signature([
-                    inspect.Parameter('include_leader', inspect.Parameter.KEYWORD_ONLY, default=True)])):
-                result = launch.supervise(['/benign-model'], hard, managed_foreground=True,
-                                          control=control, execution_budget=execution)
+             patch.object(ownership, 'signal_session', autospec=True) as signal_session:
+            result = launch.supervise(['/benign-model'], hard, managed_foreground=True,
+                                      control=control, execution_budget=execution)
             killpg.assert_not_called(); signal_session.assert_not_called()
         self.assertEqual(control.registered, (30, 'openmpi'))
         return result, control
