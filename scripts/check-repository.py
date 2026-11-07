@@ -11,6 +11,7 @@ for name in filter(None,paths):
     path=Path(name)
     allowed=name in {'.gitignore','README.md','VALIDATION_REPORT.md'}
     allowed |= name=='config/makefile.include.macos-arm64'
+    allowed |= name=='.github/workflows/runner-ownership.yml'
     allowed |= path.parts[0] in allowed_roots and path.suffix in allowed_suffixes
     if not allowed or path.name.startswith(('POTCAR','vasp_std','vasp_gam','vasp_ncl')):
         raise SystemExit('Disallowed tracked path: '+name)
